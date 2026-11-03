@@ -31,4 +31,24 @@ class JobPolicy
 
         return false;
     }
+
+    /**
+     * Tentukan apakah user boleh melihat daftar job (§2.5).
+     */
+    public function viewAny(User $user): bool
+    {
+        // Peran non-Field boleh melihat daftar semua job di company-nya
+        if ($user->hasAnyRole([
+            Role::ADMIN,
+            Role::CS,
+            Role::CUSTOMS_SPECIALIST,
+            Role::OPS,
+            Role::FINANCE,
+        ])) {
+            return true;
+        }
+
+        // Field boleh melihat daftar job yang ditugaskan kepadanya
+        return $user->hasRole(Role::FIELD);
+    }
 }

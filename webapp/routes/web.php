@@ -138,5 +138,15 @@ Route::middleware(['auth', 'can:kurs_internal'])
         Route::get('exposure', [\App\Http\Controllers\Finance\InvoiceController::class, 'exposure'])->name('exposure');
     });
 
+// Laporan (§7, Tiket 16)
+Route::middleware(['auth'])->group(function () {
+    Route::get('reports/jobs', [\App\Http\Controllers\ReportController::class, 'jobList'])->name('reports.jobs');
+    Route::get('reports/exposure', [\App\Http\Controllers\ReportController::class, 'exposurePerImportir'])->name('reports.exposure');
+    Route::get('reports/aging', [\App\Http\Controllers\ReportController::class, 'aging'])->name('reports.aging');
+    Route::get('reports/demurrage', [\App\Http\Controllers\ReportController::class, 'demurragePerLine'])->name('reports.demurrage');
+    Route::get('reports/deposit', [\App\Http\Controllers\ReportController::class, 'depositFlow'])->name('reports.deposit');
+    Route::get('reports/estimate-vs-actual', [\App\Http\Controllers\ReportController::class, 'estimateVsActual'])->name('reports.estimate-vs-actual');
+});
+
 require __DIR__.'/settings.php';
 require __DIR__.'/auth.php';
