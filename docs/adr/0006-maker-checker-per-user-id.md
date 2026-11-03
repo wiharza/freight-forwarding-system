@@ -1,0 +1,5 @@
+# 0006 — Maker-checker ditegakkan per user ID, bukan per peran
+
+Konteks: satu user boleh memegang lebih dari satu peran (keputusan RBAC); jika approval diperiksa per peran, satu orang bisa menghitung kalkulasi lalu menyetujui snapshot buatannya sendiri. Keputusan: pencipta dan penyetuju suatu aksi harus dua user berbeda — ditegakkan lewat user ID — berlaku untuk approve Snapshot PIB, override FTA, approve invoice, dan reopen close. Peran Admin bukan superuser: cakupnya hanya master data, user, checklist master, dan konfigurasi; kerja operasional memerlukan peran operasional yang eksplisit. Alternatif yang ditolak: approval diperiksa per peran (membuka jalan pintas maker-checker) dan Admin all-access.
+
+Konsekuensi: setiap objek approval wajib menyimpan pembuat dan penyetuju (user ID berbeda); Field hanya melihat job yang ditugaskan (tanpa data invoice/kurs/titipan); Ops tidak boleh memverifikasi inputannya sendiri; batas nominal approve invoice disimpan per user Finance, bukan peran ke-7.

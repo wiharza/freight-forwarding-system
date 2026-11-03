@@ -1,0 +1,17 @@
+{
+    "name": "PPJK Forwarding System",
+    "short_name": "PPJK",
+    "description": "Sistem pengurusan impor laut untuk PPJK — job, kontainer, milestone, pungutan.",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#1c1c1c",
+    "icons": [
+        {
+            "src": "/app-logo-icon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
