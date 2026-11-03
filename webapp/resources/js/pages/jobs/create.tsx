@@ -12,6 +12,7 @@ type ImportirItem = { id: number; name: string; npwp: string; status_api: string
 type ShippingLineItem = { id: number; code: string; name: string };
 type PortItem = { id: number; code: string; name: string };
 type ContainerTypeItem = { id: number; size: string; type: string };
+type VesselItem = { id: number; name: string; imo_number: string | null; call_sign: string | null; shipping_line_id: number | null };
 
 type ContainerRow = {
     container_number: string;
@@ -31,12 +32,14 @@ export default function JobsCreate({
     shippingLines,
     ports,
     containerTypes,
+    vessels,
     ftaSchemes,
 }: {
     importirs: ImportirItem[];
     shippingLines: ShippingLineItem[];
     ports: PortItem[];
     containerTypes: ContainerTypeItem[];
+    vessels: VesselItem[];
     ftaSchemes: string[];
 }) {
     const { data, setData, post, processing, errors } = useForm({
@@ -46,6 +49,7 @@ export default function JobsCreate({
         bl_date: new Date().toISOString().split('T')[0],
         pol_id: ports[0]?.id ?? '',
         pod_id: ports[0]?.id ?? '',
+        vessel_id: '' as number | '',
         vessel_name: '',
         voyage_number: '',
         eta: '',
@@ -59,6 +63,13 @@ export default function JobsCreate({
             { container_number: '', size: '20', type: 'Dry', seal_number: '', gross_weight_kg: '20000' },
         ] as ContainerRow[],
     });
+
+    const selectedVessel = vessels.find((v) => v.id === data.vessel_id);
+
+    // DQ-22: ukuran & tipe dari master jenis kontainer, bukan hardcoded
+    const sizeOptions = Array.from(new Set(containerTypes.map((ct) => ct.size)));
+    const typeOptionsFor = (size: string) =>
+        containerTypes.filter((ct) => ct.size === size).map((ct) => ct.type);
 
     const addContainer = () => {
         setData('containers', [
@@ -177,13 +188,40 @@ export default function JobsCreate({
 
                         <div className="grid gap-4 sm:grid-cols-4">
                             <div>
-                                <Label htmlFor="vessel_name">Nama Kapal (Vessel)</Label>
+                                <Label htmlFor="vessel_id">Kapal (dari Master — anti salah ketik)</Label>
+                                <select
+                                    id="vessel_id"
+                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    value={data.vessel_id}
+                                    onChange={(e) =>
+                                        setData('vessel_id', e.target.value === '' ? '' : parseInt(e.target.value))
+                                    }
+                                >
+                                    <option value="">— Ketik manual / belum ada di master —</option>
+                                    {vessels.map((v) => (
+                                        <option key={v.id} value={v.id}>
+                                            {v.name}
+                                            {v.imo_number ? ` — IMO ${v.imo_number}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedVessel?.imo_number && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        IMO {selectedVessel.imo_number}
+                                        {selectedVessel.call_sign ? ` · Call Sign ${selectedVessel.call_sign}` : ''}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <Label htmlFor="vessel_name">Nama Kapal (manual / legacy Excel)</Label>
                                 <Input
                                     id="vessel_name"
-                                    value={data.vessel_name}
+                                    value={data.vessel_id ? (selectedVessel?.name ?? '') : data.vessel_name}
                                     onChange={(e) => setData('vessel_name', e.target.value)}
+                                    disabled={!!data.vessel_id}
                                     placeholder="Contoh: SITC SHANGHAI"
                                 />
+                                {errors.vessel_id && <p className="text-xs text-red-600 mt-1">{errors.vessel_id}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="voyage_number">Voyage No</Label>
@@ -194,23 +232,25 @@ export default function JobsCreate({
                                     placeholder="Contoh: 2611N"
                                 />
                             </div>
-                            <div>
-                                <Label htmlFor="eta">ETA (Perkiraan Tiba)</Label>
-                                <Input
-                                    id="eta"
-                                    type="date"
-                                    value={data.eta}
-                                    onChange={(e) => setData('eta', e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="ata">ATA (Aktual Tiba)</Label>
-                                <Input
-                                    id="ata"
-                                    type="date"
-                                    value={data.ata}
-                                    onChange={(e) => setData('ata', e.target.value)}
-                                />
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <Label htmlFor="eta">ETA</Label>
+                                    <Input
+                                        id="eta"
+                                        type="date"
+                                        value={data.eta}
+                                        onChange={(e) => setData('eta', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="ata">ATA</Label>
+                                    <Input
+                                        id="ata"
+                                        type="date"
+                                        value={data.ata}
+                                        onChange={(e) => setData('ata', e.target.value)}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -274,11 +314,24 @@ export default function JobsCreate({
                                         <select
                                             className="w-full border rounded-md p-2 text-sm bg-background mt-1"
                                             value={c.size}
-                                            onChange={(e) => updateContainer(idx, 'size', e.target.value)}
+                                            onChange={(e) => {
+                                                const nextSize = e.target.value;
+                                                const next = [...data.containers];
+                                                // Ganti tipe ke opsi pertama yang valid untuk ukuran baru
+                                                const validTypes = typeOptionsFor(nextSize);
+                                                next[idx] = {
+                                                    ...next[idx],
+                                                    size: nextSize,
+                                                    type: validTypes.includes(next[idx].type)
+                                                        ? next[idx].type
+                                                        : (validTypes[0] ?? ''),
+                                                };
+                                                setData('containers', next);
+                                            }}
                                         >
-                                            <option value="20">20'</option>
-                                            <option value="40">40'</option>
-                                            <option value="45">45'</option>
+                                            {sizeOptions.map((s) => (
+                                                <option key={s} value={s}>{s}'</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>
@@ -288,11 +341,13 @@ export default function JobsCreate({
                                             value={c.type}
                                             onChange={(e) => updateContainer(idx, 'type', e.target.value)}
                                         >
-                                            <option value="Dry">Dry</option>
-                                            <option value="Reefer">Reefer</option>
-                                            <option value="High Cube">High Cube</option>
-                                            <option value="Open Top">Open Top</option>
+                                            {typeOptionsFor(c.size).map((t) => (
+                                                <option key={t} value={t}>{t}</option>
+                                            ))}
                                         </select>
+                                        {errors[`containers.${idx}.type`] && (
+                                            <p className="text-xs text-red-600 mt-1">{errors[`containers.${idx}.type`]}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <Label className="text-xs">No. Seal</Label>

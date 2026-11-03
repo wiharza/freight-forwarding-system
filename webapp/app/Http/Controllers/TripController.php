@@ -49,7 +49,12 @@ class TripController extends Controller
         return Inertia::render('trips/create', [
             'jobId' => $jobId,
             'vendors' => Vendor::query()->where('company_id', request()->user()->company_id)->get(['id', 'name', 'vendor_type']),
-            'jobs' => $jobId ? collect() : \App\Models\Job::query()->where('company_id', request()->user()->company_id)->orderByDesc('id')->get(['id', 'job_number']),
+            // Kontainer ikut dimuat agar form bisa memilih kontainer per job
+            'jobs' => $jobId ? collect() : Job::query()
+                ->with('containers:id,job_id,size,type,container_number')
+                ->where('company_id', request()->user()->company_id)
+                ->orderByDesc('id')
+                ->get(['id', 'job_number']),
             'containerTypes' => ['20', '40', '45'],
             'locations' => Location::query()->where('company_id', request()->user()->company_id)->get(['id', 'name', 'code', 'type']),
         ]);

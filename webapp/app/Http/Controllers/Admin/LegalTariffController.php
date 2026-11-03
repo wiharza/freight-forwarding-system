@@ -8,6 +8,7 @@ use App\Models\LuxuryGood;
 use App\Models\MfnTariff;
 use App\Models\Pph22Rule;
 use App\Support\Audit;
+use App\Support\FormatRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,7 +35,7 @@ class LegalTariffController extends Controller
     public function storeMfn(Request $request): RedirectResponse
     {
         $data = $request->validate([
-            'hs_code' => ['required', 'string', 'max:12'],
+            'hs_code' => FormatRules::hsCodeRules(), // DQ-20
             'description' => ['nullable', 'string', 'max:255'],
             'bm_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             'effective_from' => ['required', 'date'],
@@ -43,6 +44,7 @@ class LegalTariffController extends Controller
             'legal_basis' => ['required', 'string', 'max:255'],
         ]);
 
+        $data['hs_code'] = FormatRules::normalizeHsCode($data['hs_code']);
         $data['created_by_user_id'] = $request->user()->id;
         $tariff = MfnTariff::query()->create($data);
 
@@ -87,7 +89,7 @@ class LegalTariffController extends Controller
     {
         $data = $request->validate([
             'scheme_code' => ['required', Rule::in(array_keys(FtaTariff::SCHEMES))],
-            'hs_code' => ['required', 'string', 'max:12'],
+            'hs_code' => FormatRules::hsCodeRules(), // DQ-20
             'fta_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
@@ -95,6 +97,7 @@ class LegalTariffController extends Controller
             'legal_basis' => ['required', 'string', 'max:255'],
         ]);
 
+        $data['hs_code'] = FormatRules::normalizeHsCode($data['hs_code']);
         $data['coo_type'] = FtaTariff::SCHEMES[$data['scheme_code']] ?? null;
         $data['created_by_user_id'] = $request->user()->id;
 

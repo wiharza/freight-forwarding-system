@@ -35,6 +35,7 @@ class Job extends Model
         'bl_date',
         'pol_id',
         'pod_id',
+        'vessel_id',
         'vessel_name',
         'voyage_number',
         'eta',
@@ -79,6 +80,12 @@ class Job extends Model
     public function pod(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'pod_id');
+    }
+
+    /** Kapal dari master (DQ-18) — sumber IMO; `vessel_name` tetap snapshot riwayat. */
+    public function vessel(): BelongsTo
+    {
+        return $this->belongsTo(Vessel::class);
     }
 
     public function containers(): HasMany

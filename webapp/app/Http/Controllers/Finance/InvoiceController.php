@@ -11,6 +11,7 @@ use App\Models\Job;
 use App\Models\JobCost;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
+use App\Models\TitipanDana;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -32,6 +33,8 @@ class InvoiceController extends Controller
 
         return Inertia::render('finance/invoices', [
             'invoices' => $invoices,
+            // Untuk pemilih job saat membuat invoice baru
+            'jobs' => Job::query()->with('importir:id,name')->orderByDesc('id')->get(['id', 'job_number', 'importir_id']),
         ]);
     }
 
@@ -171,7 +174,14 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice): Response
     {
-        $invoice->load(['job:id,job_number', 'importir:id,name', 'items', 'creator:id,name', 'approver:id,name']);
+        $invoice->load([
+            'job:id,job_number',
+            'importir:id,name',
+            'items',
+            'payments.allocations',
+            'creator:id,name',
+            'approver:id,name',
+        ]);
 
         return Inertia::render('finance/invoice-show', [
             'invoice' => $invoice,

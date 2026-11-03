@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
+use App\Models\ContainerType;
 use App\Models\Importir;
 use App\Models\ImportirChecklistOverride;
 use App\Models\Job;
@@ -51,6 +52,11 @@ class JobAndChecklistTest extends TestCase
         $this->line = ShippingLine::factory()->create(['company_id' => $this->company->id]);
         $this->pod = Location::factory()->create(['company_id' => $this->company->id, 'type' => Location::TYPE_PORT]);
 
+        // DQ-22: pasangan (size, type) kontainer wajib terdaftar di master
+        foreach ([['20', 'Dry'], ['20', 'Reefer'], ['40', 'Dry'], ['40', 'High Cube']] as [$size, $type]) {
+            ContainerType::query()->create(['company_id' => $this->company->id, 'size' => $size, 'type' => $type]);
+        }
+
         app(\App\Support\CompanyContext::class)->set($this->company->id);
     }
 
@@ -69,14 +75,14 @@ class JobAndChecklistTest extends TestCase
             'is_fcl' => true,
             'containers' => [
                 [
-                    'container_number' => 'MSKU1234567',
+                    'container_number' => 'MSKU1234565', // check digit ISO 6346 valid (DQ-19)
                     'size' => '20',
                     'type' => 'Dry',
                     'seal_number' => 'SEAL-01',
                     'gross_weight_kg' => '21000',
                 ],
                 [
-                    'container_number' => 'MSKU7654321',
+                    'container_number' => 'MSKU7654328',
                     'size' => '40',
                     'type' => 'High Cube',
                     'seal_number' => 'SEAL-02',
@@ -97,7 +103,7 @@ class JobAndChecklistTest extends TestCase
         $this->assertCount(2, $job->containers);
         $this->assertDatabaseHas('containers', [
             'job_id' => $job->id,
-            'container_number' => 'MSKU1234567',
+            'container_number' => 'MSKU1234565',
             'size' => '20',
         ]);
 

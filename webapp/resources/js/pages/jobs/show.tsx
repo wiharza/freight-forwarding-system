@@ -106,6 +106,7 @@ type JobDetail = {
     cached_status: string;
     importir: { id: number; name: string; npwp: string; status_api: string } | null;
     shipping_line: { id: number; code: string; name: string } | null;
+    vessel: { id: number; name: string; imo_number: string | null; call_sign: string | null } | null;
     pod: { id: number; code: string; name: string } | null;
     containers: ContainerItem[];
     documents: DocumentItem[];
@@ -435,6 +436,12 @@ export default function JobsShow({
                             <div>
                                 <span className="text-muted-foreground text-xs block">Kapal & Voyage:</span>
                                 <span>{job.vessel_name || '-'} {job.voyage_number ? `(${job.voyage_number})` : ''}</span>
+                                {job.vessel?.imo_number && (
+                                    <span className="text-muted-foreground text-xs block">
+                                        IMO {job.vessel.imo_number}
+                                        {job.vessel.call_sign ? ` · Call Sign ${job.vessel.call_sign}` : ''}
+                                    </span>
+                                )}
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>

@@ -3,6 +3,7 @@ import { Link, usePage } from '@inertiajs/react';
 const tabs = [
     { title: 'Importir', url: '/admin/master/importirs' },
     { title: 'Shipping Line', url: '/admin/master/shipping-lines' },
+    { title: 'Kapal (IMO)', url: '/admin/master/vessels' },
     { title: 'Tarif Line', url: '/admin/master/line-tariffs' },
     { title: 'Tarif MFN', url: '/admin/master/mfn-tariffs' },
     { title: 'Preferensi FTA', url: '/admin/master/fta-tariffs' },

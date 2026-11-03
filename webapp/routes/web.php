@@ -35,6 +35,10 @@ Route::middleware(['auth', 'can:master_data'])
         Route::get('shipping-lines', [\App\Http\Controllers\Admin\MasterDataController::class, 'shippingLines'])->name('shipping-lines');
         Route::post('shipping-lines', [\App\Http\Controllers\Admin\MasterDataController::class, 'storeShippingLine'])->name('shipping-lines.store');
 
+        // Master kapal (DQ-18)
+        Route::get('vessels', [\App\Http\Controllers\Admin\MasterDataController::class, 'vessels'])->name('vessels');
+        Route::post('vessels', [\App\Http\Controllers\Admin\MasterDataController::class, 'storeVessel'])->name('vessels.store');
+
         Route::get('vendors', [\App\Http\Controllers\Admin\MasterDataController::class, 'vendors'])->name('vendors');
         Route::post('vendors', [\App\Http\Controllers\Admin\MasterDataController::class, 'storeVendor'])->name('vendors.store');
 
@@ -84,6 +88,7 @@ Route::middleware(['auth'])->group(function () {
     // Kalkulator PIB v2 (§3.2, Tiket 09)
     Route::get('jobs/{job}/calculator', [\App\Http\Controllers\PibCalculatorController::class, 'show'])->name('jobs.calculator');
     Route::post('jobs/{job}/calculator/draft', [\App\Http\Controllers\PibCalculatorController::class, 'storeDraft'])->name('jobs.calculator.draft');
+    Route::post('jobs/{job}/calculator/{declaration}/approve', [\App\Http\Controllers\PibCalculatorController::class, 'approve'])->name('jobs.calculator.approve');
 
     Route::post('jobs/{job}/documents/{document}/upload', [\App\Http\Controllers\JobController::class, 'uploadDocument'])->name('jobs.documents.upload');
     Route::post('jobs/{job}/documents/{document}/verify', [\App\Http\Controllers\JobController::class, 'verifyDocument'])->name('jobs.documents.verify');

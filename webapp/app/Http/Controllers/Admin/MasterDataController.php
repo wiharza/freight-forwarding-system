@@ -9,7 +9,9 @@ use App\Models\Importir;
 use App\Models\Location;
 use App\Models\ShippingLine;
 use App\Models\Vendor;
+use App\Models\Vessel;
 use App\Support\Audit;
+use App\Support\FormatRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -30,7 +32,7 @@ class MasterDataController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'npwp' => [
-                'required', 'string', 'max:20',
+                ...FormatRules::npwpRules(), // DQ-20: 15 digit / 16 digit NIK
                 Rule::unique('importirs')->where('company_id', app(\App\Support\CompanyContext::class)->id()),
             ],
             'nib' => ['nullable', 'string', 'max:50'],
@@ -140,6 +142,41 @@ class MasterDataController extends Controller
         return Inertia::render('admin/master/currencies', [
             'items' => Currency::query()->orderBy('code')->get(),
         ]);
+    }
+
+    // Master kapal (DQ-18): sumber dropdown nama kapal + IMO di form Job.
+    public function vessels(): Response
+    {
+        return Inertia::render('admin/master/vessels', [
+            'items' => Vessel::query()->with('shippingLine:id,code,name')->orderBy('name')->get(),
+            'shippingLines' => ShippingLine::query()->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    public function storeVessel(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name' => [
+                'required', 'string', 'max:100',
+                Rule::unique('vessels')->where('company_id', app(\App\Support\CompanyContext::class)->id()),
+            ],
+            'imo_number' => FormatRules::imoRules(),
+            'call_sign' => ['nullable', 'string', 'max:10'],
+            'shipping_line_id' => ['nullable', Rule::exists('shipping_lines', 'id')],
+        ]);
+
+        // Normalisasi: "IMO 9074729" → "9074729"
+        $data['imo_number'] = isset($data['imo_number'])
+            ? FormatRules::normalizeImo($data['imo_number'])
+            : null;
+
+        $vessel = Vessel::query()->create($data);
+        Audit::record('vessel.created', $vessel, [
+            'name' => $vessel->name,
+            'imo_number' => $vessel->imo_number,
+        ]);
+
+        return redirect()->back();
     }
 
     public function updateCurrency(Request $request, Currency $currency): RedirectResponse

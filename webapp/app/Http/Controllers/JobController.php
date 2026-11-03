@@ -12,7 +12,9 @@ use App\Models\Location;
 use App\Models\Role;
 use App\Models\ShippingLine;
 use App\Models\User;
+use App\Models\Vessel;
 use App\Support\Audit;
+use App\Support\FormatRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -75,6 +77,7 @@ class JobController extends Controller
             'shippingLines' => ShippingLine::query()->orderBy('name')->get(['id', 'code', 'name']),
             'ports' => Location::query()->where('type', Location::TYPE_PORT)->orderBy('name')->get(['id', 'code', 'name']),
             'containerTypes' => ContainerType::query()->orderBy('size')->get(['id', 'size', 'type']),
+            'vessels' => Vessel::query()->with('shippingLine:id,code,name')->orderBy('name')->get(['id', 'name', 'imo_number', 'call_sign', 'shipping_line_id']),
             'ftaSchemes' => array_keys(FtaTariff::SCHEMES),
         ]);
     }
@@ -90,6 +93,8 @@ class JobController extends Controller
             ]);
         }
 
+        $companyId = $request->user()->company_id;
+
         $data = $request->validate([
             'importir_id' => ['required', 'exists:importirs,id'],
             'shipping_line_id' => ['required', 'exists:shipping_lines,id'],
@@ -97,6 +102,7 @@ class JobController extends Controller
             'bl_date' => ['required', 'date'],
             'pol_id' => ['nullable', 'exists:locations,id'],
             'pod_id' => ['required', 'exists:locations,id'],
+            'vessel_id' => ['nullable', Rule::exists('vessels', 'id')->where('company_id', $companyId)],
             'vessel_name' => ['nullable', 'string', 'max:100'],
             'voyage_number' => ['nullable', 'string', 'max:50'],
             'eta' => ['nullable', 'date'],
@@ -106,14 +112,33 @@ class JobController extends Controller
             'referensi_excel_lama' => ['nullable', 'string', 'max:100'],
             'tanggal_cutover' => ['nullable', 'date'],
             'containers' => ['required', 'array', 'min:1'],
-            'containers.*.container_number' => ['required', 'string', 'max:20'],
-            'containers.*.size' => ['required', Rule::in(['20', '40', '45'])],
+            'containers.*.container_number' => FormatRules::containerNumberRules(), // DQ-19
+            'containers.*.size' => ['required', 'string', 'max:5'],
             'containers.*.type' => ['required', 'string', 'max:30'],
             'containers.*.seal_number' => ['nullable', 'string', 'max:50'],
             'containers.*.gross_weight_kg' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $companyId = $request->user()->company_id;
+        // DQ-22: pasangan (size, type) wajib terdaftar di master jenis kontainer
+        foreach ($data['containers'] as $i => $c) {
+            $exists = ContainerType::query()
+                ->where('size', (string) $c['size'])
+                ->where('type', $c['type'])
+                ->exists();
+            if (! $exists) {
+                throw ValidationException::withMessages([
+                    "containers.{$i}.type" => "Kombinasi ukuran {$c['size']}' dan tipe {$c['type']} tidak ada di master jenis kontainer.",
+                ]);
+            }
+        }
+
+        // DQ-18: pilih kapal dari master → nama di-snapshot ke job; master boleh
+        // berubah tanpa menulis ulang riwayat job.
+        $vesselName = $data['vessel_name'] ?? null;
+        if (! empty($data['vessel_id'])) {
+            $vesselName = Vessel::query()->findOrFail($data['vessel_id'])->name;
+        }
+
         $jobNumber = 'JOB-' . date('Ym') . '-' . str_pad((string) (Job::query()->count() + 1), 4, '0', STR_PAD_LEFT);
 
         $job = Job::query()->create([
@@ -124,7 +149,8 @@ class JobController extends Controller
             'bl_date' => $data['bl_date'],
             'pol_id' => $data['pol_id'] ?? null,
             'pod_id' => $data['pod_id'],
-            'vessel_name' => $data['vessel_name'] ?? null,
+            'vessel_id' => $data['vessel_id'] ?? null,
+            'vessel_name' => $vesselName,
             'voyage_number' => $data['voyage_number'] ?? null,
             'eta' => $data['eta'] ?? null,
             'ata' => $data['ata'] ?? null,
@@ -137,11 +163,11 @@ class JobController extends Controller
             'created_by_user_id' => $request->user()->id,
         ]);
 
-        // Simpan 1..N kontainer
+        // Simpan 1..N kontainer (nomor dinormalisasi: trim, buang pemisah, uppercase)
         foreach ($data['containers'] as $c) {
             $job->containers()->create([
                 'company_id' => $companyId,
-                'container_number' => strtoupper(trim($c['container_number'])),
+                'container_number' => FormatRules::normalizeContainerNumber($c['container_number']),
                 'size' => $c['size'],
                 'type' => $c['type'],
                 'seal_number' => $c['seal_number'] ?? null,
@@ -164,6 +190,7 @@ class JobController extends Controller
         $job->load([
             'importir',
             'shippingLine',
+            'vessel:id,name,imo_number,call_sign',
             'pol',
             'pod',
             'containers',

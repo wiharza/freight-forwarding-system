@@ -4,7 +4,7 @@ import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, Box, CircleDollarSign, Database, Folder, LayoutGrid, Users } from 'lucide-react';
+import { BookOpen, Box, CircleDollarSign, Database, Folder, LayoutGrid, Receipt, Truck, Users } from 'lucide-react';
 import AppLogo from './app-logo';
 
 const mainNavItems: NavItem[] = [
@@ -17,6 +17,11 @@ const mainNavItems: NavItem[] = [
         title: 'Daftar Job',
         url: '/jobs',
         icon: Box,
+    },
+    {
+        title: 'Trip Trucking',
+        url: '/trips',
+        icon: Truck,
     },
 ];
 
@@ -37,6 +42,16 @@ const financeNavItems: NavItem[] = [
     {
         title: 'Kurs Internal',
         url: '/finance/rates',
+        icon: CircleDollarSign,
+    },
+    {
+        title: 'Invoice',
+        url: '/finance/invoices',
+        icon: Receipt,
+    },
+    {
+        title: 'Eksposur Importir',
+        url: '/finance/exposure',
         icon: CircleDollarSign,
     },
 ];

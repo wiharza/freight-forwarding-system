@@ -23,6 +23,7 @@ class CustomsDeclaration extends Model
         'version',
         'status',
         'kmk_number',
+        'incoterm',
         'total_cif_valas',
         'total_cif_idr',
         'total_bm',
