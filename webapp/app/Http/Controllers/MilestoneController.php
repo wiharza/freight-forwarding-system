@@ -62,10 +62,15 @@ class MilestoneController extends Controller
             $filePath = $request->file('proof_file')->store("proofs/{$job->company_id}/{$job->id}", 'public');
         }
 
-        // Daftar target kontainer (single vs batch)
+        // Daftar target kontainer (single vs batch). BUGFIX 2026-11-04:
+        // $data['container_id'] tidak ada di $data saat UI tidak mengirimnya
+        // (milestone level-Job: pib_filed/sppb/discharge/do_release) karena
+        // kunci 'nullable' yang absen tidak masuk hasil validate() — akses
+        // langsung melempar "Undefined array key" (500). Pakai empty() yang
+        // aman untuk kunci yang tidak ada; [null] = milestone level-Job.
         $targetContainerIds = ! empty($data['container_ids'])
             ? $data['container_ids']
-            : ($data['container_id'] ? [$data['container_id']] : [null]);
+            : (! empty($data['container_id']) ? [$data['container_id']] : [null]);
 
         // Validasi kronologis untuk setiap kontainer (§2.2, Q15)
         foreach ($targetContainerIds as $cid) {
