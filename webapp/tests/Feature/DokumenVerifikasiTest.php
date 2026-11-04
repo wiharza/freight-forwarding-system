@@ -22,7 +22,10 @@ use Tests\TestCase;
 /**
  * Tes perbaikan verifikasi dokumen Job: bug Cancel pada prompt verifikasi
  * (perilaku frontend — diverifikasi lewat review kode), tombol Unduh/Lihat,
- * dan Batalkan Verifikasi (unverify) dengan alasan wajib + maker-checker.
+ * dan Batalkan Verifikasi (unverify) dengan alasan wajib + audit.
+ * Relaksasi 2026-11-04 (keputusan user): verifikator asli BOLEH membatalkan
+ * verifikasinya sendiri — ADR 0006 maker-checker dilonggarkan KHUSUS untuk
+ * unverify (koreksi, bukan persetujuan); verify tidak berubah.
  */
 class DokumenVerifikasiTest extends TestCase
 {
@@ -190,18 +193,63 @@ class DokumenVerifikasiTest extends TestCase
         $this->assertSame(JobDocument::STATUS_DIUPLOAD, $this->doc->fresh()->status);
     }
 
+    /**
+     * Relaksasi ADR 0006 khusus unverify (keputusan user 2026-11-04):
+     * verifikator asli BOLEH membatalkan verifikasinya sendiri, dengan
+     * alasan wajib + audit. Pembatalan adalah koreksi, bukan persetujuan.
+     */
     #[Test]
-    public function unverify_oleh_verifikator_asli_ditolak_maker_checker(): void
+    public function unverify_oleh_verifikator_asli_diperbolehkan_dengan_alasan_dan_audit(): void
     {
         $this->unggah($this->cs);
         $this->verifikasi($this->ops1);
 
         $response = $this->actingAs($this->ops1)->post(
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
-            ['reason' => 'Saya yang memverifikasi, saya batalkan.'],
+            ['reason' => 'Saya yang memverifikasi, saya batalkan — nomor B/L salah baca.'],
         );
-        $response->assertSessionHasErrors('maker_checker');
-        $this->assertSame(JobDocument::STATUS_DIVERIFIKASI, $this->doc->fresh()->status);
+        $response->assertSessionHasNoErrors();
+
+        $doc = $this->doc->fresh();
+        $this->assertSame(JobDocument::STATUS_DIUPLOAD, $doc->status);
+        $this->assertNull($doc->verified_by_user_id);
+        $this->assertNull($doc->verified_at);
+
+        $audit = AuditTrail::query()
+            ->where('action', 'job_document.unverified')
+            ->where('object_id', $this->doc->id)
+            ->firstOrFail();
+        $this->assertSame('Saya yang memverifikasi, saya batalkan — nomor B/L salah baca.', $audit->reason);
+        $this->assertSame($this->ops1->id, $audit->user_id);
+
+        // Setelah dibatalkan, dokumen bisa diverifikasi lagi (verify tak berubah).
+        $this->verifikasi($this->ops2);
+    }
+
+    /**
+     * Verify TIDAK berubah oleh relaksasi unverify: setelah verifikator
+     * asli membatalkan verifikasinya sendiri, ia tetap bisa memverifikasi
+     * ulang dokumen yang sama (endpoint verify tidak mendapat pembatasan
+     * baru). Maker-checker verify yang sesungguhnya ditegakkan di sisi
+     * server pada Milestone::verify() — lihat
+     * MilestoneAndPwaTest::verifikasi_milestone_menegakkan_maker_checker,
+     * yang tetap hijau bersama suite ini.
+     */
+    #[Test]
+    public function verifikasi_ulang_oleh_verifikator_asli_setelah_unverify_tetap_berfungsi(): void
+    {
+        $this->unggah($this->cs);
+        $this->verifikasi($this->ops1);
+
+        $response = $this->actingAs($this->ops1)->post(
+            route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
+            ['reason' => 'Salah baca nomor, batalkan dulu.'],
+        );
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(JobDocument::STATUS_DIUPLOAD, $this->doc->fresh()->status);
+
+        // Verifikasi ulang oleh user yang sama tetap berfungsi.
+        $this->verifikasi($this->ops1);
     }
 
     #[Test]
