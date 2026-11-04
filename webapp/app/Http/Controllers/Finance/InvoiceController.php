@@ -41,6 +41,10 @@ class InvoiceController extends Controller
     public function create(Job $job): Response
     {
         Gate::authorize('invoice');
+        // HARDENING 2026-11-04 (temuan #1): pembuatan invoice juga wajib
+        // lolos akses Job — sebelumnya hanya ability global, sehingga Job
+        // perusahaan lain bisa dibuka lewat route binding.
+        Gate::authorize('view', $job);
 
         // HARDENING 2026-11-04: preview memakai SATU definisi billable yang
         // sama dengan store() (Job::billableCosts) — sebelumnya filter preview
@@ -57,6 +61,9 @@ class InvoiceController extends Controller
     public function store(Request $request, Job $job): RedirectResponse
     {
         Gate::authorize('invoice');
+        // HARDENING 2026-11-04 (temuan #1): sama seperti create() — store
+        // invoice wajib lolos akses Job.
+        Gate::authorize('view', $job);
 
         $data = $request->validate([
             'invoice_date' => ['required', 'date'],

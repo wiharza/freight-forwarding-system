@@ -98,12 +98,17 @@ class JobController extends Controller
         $companyId = $request->user()->company_id;
 
         $data = $request->validate([
-            'importir_id' => ['required', 'exists:importirs,id'],
-            'shipping_line_id' => ['required', 'exists:shipping_lines,id'],
+            // HARDENING 2026-11-04 (temuan #1, lintas-tenant): keempat FK ini
+            // sebelumnya hanya dicek keberadaannya ('exists') tanpa scope
+            // company — Job bisa terhubung ke importir/shipping line/
+            // pelabuhan perusahaan lain. Sekarang di-scope ke company user,
+            // sama seperti vessel_id di bawah.
+            'importir_id' => ['required', Rule::exists('importirs', 'id')->where('company_id', $companyId)],
+            'shipping_line_id' => ['required', Rule::exists('shipping_lines', 'id')->where('company_id', $companyId)],
             'bl_number' => ['required', 'string', 'max:50'],
             'bl_date' => ['required', 'date'],
-            'pol_id' => ['nullable', 'exists:locations,id'],
-            'pod_id' => ['required', 'exists:locations,id'],
+            'pol_id' => ['nullable', Rule::exists('locations', 'id')->where('company_id', $companyId)],
+            'pod_id' => ['required', Rule::exists('locations', 'id')->where('company_id', $companyId)],
             'vessel_id' => ['nullable', Rule::exists('vessels', 'id')->where('company_id', $companyId)],
             'vessel_name' => ['nullable', 'string', 'max:100'],
             'voyage_number' => ['nullable', 'string', 'max:50'],
@@ -317,9 +322,13 @@ class JobController extends Controller
     public function assignField(Request $request, Job $job): RedirectResponse
     {
         Gate::authorize('job_assignment');
+        // HARDENING 2026-11-04 (temuan #1): penugasan Field juga harus
+        // lolos akses Job, dan user Field yang ditugaskan harus berasal dari
+        // company yang sama dengan Job ini.
+        Gate::authorize('view', $job);
 
         $data = $request->validate([
-            'field_user_id' => ['required', 'exists:users,id'],
+            'field_user_id' => ['required', Rule::exists('users', 'id')->where('company_id', $job->company_id)],
         ]);
 
         $job->assignField($data['field_user_id'], $request->user());

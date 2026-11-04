@@ -51,16 +51,22 @@ class TripController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $companyId = $request->user()->company_id;
+
         $data = $request->validate([
-            'job_id' => ['required', 'exists:jobs,id'],
-            'vendor_id' => ['required', 'exists:vendors,id'],
+            // HARDENING 2026-11-04 (temuan #1, lintas-tenant): job, vendor,
+            // dan lokasi sebelumnya hanya dicek keberadaannya — trip bisa
+            // dibuat dengan Job/vendor/lokasi perusahaan lain. Sekarang
+            // di-scope ke company user (kontainer sudah di-scope ke Job).
+            'job_id' => ['required', Rule::exists('jobs', 'id')->where('company_id', $companyId)],
+            'vendor_id' => ['required', Rule::exists('vendors', 'id')->where('company_id', $companyId)],
             'trip_number' => ['required', 'string', 'max:50'],
             'scheduled_date' => ['required', 'date'],
             'driver_name' => ['nullable', 'string', 'max:255'],
             'driver_phone' => ['nullable', 'string', 'max:50'],
             'vehicle_number' => ['nullable', 'string', 'max:20'],
-            'origin_location_id' => ['nullable', 'exists:locations,id'],
-            'destination_location_id' => ['nullable', 'exists:locations,id'],
+            'origin_location_id' => ['nullable', Rule::exists('locations', 'id')->where('company_id', $companyId)],
+            'destination_location_id' => ['nullable', Rule::exists('locations', 'id')->where('company_id', $companyId)],
             'container_ids' => ['required', 'array', 'min:1'],
             // HARDENING 2026-11-04: kontainer HARUS milik Job trip ini.
             'container_ids.*' => [Rule::exists('containers', 'id')->where('job_id', $request->input('job_id'))],
