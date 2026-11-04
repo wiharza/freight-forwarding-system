@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\NotificationLog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -46,6 +47,12 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'roles' => $request->user()?->roles()->pluck('slug')->all() ?? [],
+            // Badge notifikasi (§2.6, Q8, Tiket 15): jumlah entri kotak
+            // masuk yang belum dibaca pengguna yang login. Lazy — hanya
+            // dihitung saat prop dipakai halaman (header).
+            'unreadNotificationsCount' => fn () => $request->user()
+                ? NotificationLog::unreadCountFor($request->user())
+                : 0,
         ]);
     }
 }

@@ -10,6 +10,7 @@ use App\Http\Controllers\FtaGateController;
 use App\Http\Controllers\JobCloseController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MilestoneController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PibCalculatorController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SuratJalanController;
@@ -26,6 +27,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('dashboard', function () {
         return Inertia::render('dashboard');
     })->name('dashboard');
+
+    // Kotak masuk notifikasi (§2.6, Q8, Tiket 15)
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read-all');
+    Route::post('notifications/{log}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
 });
 
 // §2.5 — manajemen user hanya untuk Admin (Admin bukan superuser, tapi
