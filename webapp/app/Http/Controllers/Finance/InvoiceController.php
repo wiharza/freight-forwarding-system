@@ -104,10 +104,21 @@ class InvoiceController extends Controller
 
         $totalInvoice = $blokATotal + $blokBTotal + $serviceFee + $ppnJasa;
 
-        // Generate nomor invoice berurutan
-        $lastInvoice = Invoice::query()->orderByDesc('id')->first();
-        $nextNumber = $lastInvoice ? (int) filter_var($lastInvoice->invoice_number, FILTER_SANITIZE_NUMBER_INT) + 1 : 1;
-        $invoiceNumber = 'INV-' . date('Y') . '-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+        // Generate nomor invoice berurutan (BUGFIX 2026-11-04: filter_var dengan
+        // FILTER_SANITIZE_NUMBER_INT mempertahankan tanda '-' sehingga
+        // 'INV-2026-000001' menjadi (int)'-2026-000001' = -2026 dan setiap
+        // invoice setelah yang pertama bernomor 'INV-2026-0-2025' lalu
+        // menabrak unique constraint pada invoice ke-3. Ambil urutan dari
+        // digit terakhir nomor-nomor tahun berjalan, bukan dari string utuh.)
+        $year = date('Y');
+        $maxSequence = 0;
+        foreach (Invoice::query()->where('invoice_number', 'like', "INV-{$year}-%")->pluck('invoice_number') as $existing) {
+            if (preg_match('/(\d+)$/', $existing, $m)) {
+                $maxSequence = max($maxSequence, (int) $m[1]);
+            }
+        }
+        $nextNumber = $maxSequence + 1;
+        $invoiceNumber = 'INV-' . $year . '-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
 
         $invoice = Invoice::query()->create([
             'company_id' => $request->user()->company_id,
@@ -259,7 +270,14 @@ class InvoiceController extends Controller
         // BUGFIX: hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran ini
         // agar alokasi bertahap (batch terpisah) tidak bisa melampaui nominal payment.
         $previouslyAllocated = (float) $payment->allocations()->sum('amount');
-        $sisaPayment = (float) $payment->amount - $previouslyAllocated;
+        // BUGFIX 2026-11-04 (Q22): dana yang sudah dipindah ke Titipan Dana
+        // dari pembayaran ini (kelebihan bayar) tidak boleh dialokasikan
+        // dua kali — kurangi dari sisa yang bisa dialokasi.
+        $existingTitipan = TitipanDana::query()
+            ->where('reference', 'OVERPAY-PAY-'.$payment->id)
+            ->get()
+            ->sum(fn ($t) => $t->sisaSaldo());
+        $sisaPayment = (float) $payment->amount - $previouslyAllocated - (float) $existingTitipan;
 
         DB::beginTransaction();
         try {
@@ -309,8 +327,39 @@ class InvoiceController extends Controller
             $invoice->total_paid = (float) $invoice->total_paid + $totalAllocatedThisRequest;
             $invoice->save();
 
+            // Titipan Dana (Q22, T6 — BUGFIX 2026-11-04): Titipan Dana HANYA
+            // terbentuk dari kelebihan bayar, yaitu saat invoice sudah lunas
+            // penuh tetapi pembayaran masih bersisa. Sisa alokasi sebagian
+            // (invoice belum lunas) TIDAK menjadi Titipan Dana — dana itu
+            // masih bisa dialokasikan pada batch berikutnya. Idempotent per
+            // payment lewat reference, supaya batch susulan tidak menduplikasi.
+            $titipan = null;
+            $sisaSetelahAlokasi = round((float) $payment->amount - ($previouslyAllocated + $totalAllocatedThisRequest), 4);
+            if ($invoice->sisaTagihan() <= 0 && $sisaSetelahAlokasi > 0) {
+                $titipan = TitipanDana::query()->firstOrCreate(
+                    ['reference' => 'OVERPAY-PAY-'.$payment->id],
+                    [
+                        'company_id' => $request->user()->company_id,
+                        'importir_id' => $invoice->importir_id,
+                        'received_date' => $payment->payment_date,
+                        'amount' => $sisaSetelahAlokasi,
+                        'allocated_amount' => 0,
+                        'method' => $payment->method,
+                        'notes' => "Kelebihan bayar payment #{$payment->id} untuk invoice {$invoice->invoice_number} (Q22).",
+                        'created_by_user_id' => $request->user()->id,
+                    ]
+                );
+
+                Audit::record('titipan_dana.created', $titipan, [
+                    'payment_id' => $payment->id,
+                    'invoice_id' => $invoice->id,
+                    'amount' => $sisaSetelahAlokasi,
+                ], 'Kelebihan bayar menjadi Titipan Dana Importir');
+            }
+
             // Tandai payment sudah teralokasi penuh jika sisa habis
-            if (($previouslyAllocated + $totalAllocatedThisRequest) >= (float) $payment->amount) {
+            $accounted = $previouslyAllocated + $totalAllocatedThisRequest + ($titipan ? (float) $titipan->amount : 0);
+            if ($accounted >= (float) $payment->amount) {
                 $payment->update(['is_unallocated' => false]);
             }
 
@@ -351,6 +400,18 @@ class InvoiceController extends Controller
                 ->whereHas('job', fn ($q) => $q->where('importir_id', $imp->id))
                 ->sum('amount');
 
+            // BUGFIX 2026-11-04: lihat ReportController::exposurePerImportir —
+            // eksposur lama hanya menghitung JobCost (sumber Blok B) sehingga
+            // importir yang sudah lunas penuh tampil NEGATIF. Tambahkan Blok
+            // (a) pungutan negara dan Blok (c) jasa yang sudah ditagihkan;
+            // batasi bawah 0. (Rumus yang sama dipakai di dua controller ini;
+            // bila berubah, ubah keduanya.)
+            $totalBilledBlocks = Invoice::query()
+                ->where('importir_id', $imp->id)
+                ->where('status', '!=', Invoice::STATUS_CANCELLED)
+                ->get()
+                ->sum(fn ($inv) => (float) $inv->blok_a_total + (float) $inv->blok_c_service_fee + (float) $inv->blok_c_ppn);
+
             $titipanDana = TitipanDana::query()
                 ->where('importir_id', $imp->id)
                 ->get()
@@ -359,7 +420,7 @@ class InvoiceController extends Controller
             return [
                 'importir_id' => $imp->id,
                 'importir_name' => $imp->name,
-                'exposure_bruto' => $totalRealCost - $totalAllocated,
+                'exposure_bruto' => max(0, (float) $totalRealCost + $totalBilledBlocks - (float) $totalAllocated),
                 'titipan_dana_saldo' => $titipanDana,
             ];
         });
