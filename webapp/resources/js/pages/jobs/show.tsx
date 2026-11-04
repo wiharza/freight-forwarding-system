@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { CheckCircle2, Clock, Edit2, FileText, PlusCircle, Upload, UserCheck } from 'lucide-react';
+import { CheckCircle2, Clock, Download, Edit2, Eye, FileText, PlusCircle, Undo2, Upload, UserCheck } from 'lucide-react';
 import React, { useState } from 'react';
 
 type ContainerItem = {
@@ -130,6 +130,7 @@ export default function JobsShow({
     fieldUsers,
     canAssignField,
     canVerifyDoc,
+    canUnverifyDoc,
     closePreconditions,
     canClose,
     canReopen,
@@ -139,6 +140,7 @@ export default function JobsShow({
     fieldUsers: { id: number; name: string }[];
     canAssignField: boolean;
     canVerifyDoc: boolean;
+    canUnverifyDoc: boolean;
     closePreconditions: ClosePrecondition[];
     canClose: boolean;
     canReopen: boolean;
@@ -220,8 +222,24 @@ export default function JobsShow({
     };
 
     const handleVerifyDoc = (documentId: number) => {
-        const notes = prompt('Catatan verifikasi (opsional):') || undefined;
-        router.post(route('jobs.documents.verify', { job: job.id, document: documentId }), { notes });
+        // BUGFIX: prompt() mengembalikan null saat Cancel — tanpa cek ini,
+        // tekan Cancel pun tetap mengirim verifikasi. OK dengan catatan
+        // kosong tetap memverifikasi (catatan opsional).
+        const notes = prompt('Catatan verifikasi (opsional):');
+        if (notes === null) return;
+        router.post(route('jobs.documents.verify', { job: job.id, document: documentId }), { notes: notes || undefined });
+    };
+
+    const handleUnverifyDoc = (documentId: number) => {
+        // Pola batal yang sama seperti handleVerifyDoc: Cancel = tidak ada
+        // yang dikirim; alasan kosong juga ditolak di sini (dan di server).
+        const reason = prompt('Alasan pembatalan verifikasi (wajib):');
+        if (reason === null) return;
+        if (!reason.trim()) {
+            alert('Alasan pembatalan wajib diisi.');
+            return;
+        }
+        router.post(route('jobs.documents.unverify', { job: job.id, document: documentId }), { reason });
     };
 
     const handleStoreMilestone = (e: React.FormEvent) => {
@@ -265,6 +283,16 @@ export default function JobsShow({
 
     const hasDoReleased = job.milestones.some((m) => m.milestone_type === 'do_release' && m.is_active);
 
+    // Pratinjau native browser: PDF + gambar saja. Harus sama dengan
+    // PrivateFile::PREVIEWABLE_EXTENSIONS di server (server tetap menolak
+    // 415 bila tipe tidak didukung — UI ini hanya menyembunyikan tombol).
+    const PREVIEWABLE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const isPreviewableFile = (fileName: string | null) => {
+        if (!fileName) return false;
+        const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
+        return PREVIEWABLE_EXTENSIONS.includes(ext);
+    };
+
     const renderDocRow = (d: DocumentItem) => (
         <tr key={d.id} className="border-b last:border-b-0">
             <td className="px-3 py-2 font-medium capitalize">{d.document_type.replace(/_/g, ' ')}</td>
@@ -288,6 +316,27 @@ export default function JobsShow({
             </td>
             <td className="text-muted-foreground px-3 py-2 text-xs">{d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}</td>
             <td className="flex items-center gap-2 px-3 py-2">
+                {d.file_path && (
+                    <>
+                        <Button size="sm" variant="outline" asChild>
+                            <a href={route('jobs.documents.download', { job: job.id, document: d.id })}>
+                                <Download className="mr-1 size-3" /> Unduh
+                            </a>
+                        </Button>
+                        {isPreviewableFile(d.file_name) && (
+                            <Button size="sm" variant="outline" asChild>
+                                <a
+                                    href={route('jobs.documents.preview', { job: job.id, document: d.id })}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Pratinjau di tab baru (PDF/gambar)"
+                                >
+                                    <Eye className="mr-1 size-3" /> Lihat
+                                </a>
+                            </Button>
+                        )}
+                    </>
+                )}
                 {d.status !== 'diverifikasi' && d.status !== 'tidak_berlaku' && (
                     <>
                         {selectedDocId === d.id ? (
@@ -312,6 +361,21 @@ export default function JobsShow({
                             </Button>
                         )}
                     </>
+                )}
+                {d.status === 'diverifikasi' && canUnverifyDoc && (
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleUnverifyDoc(d.id)}
+                        disabled={authUser?.id === d.verifier?.id}
+                        title={
+                            authUser?.id === d.verifier?.id
+                                ? 'Verifikator tidak boleh membatalkan verifikasinya sendiri (Maker-Checker, ADR 0006)'
+                                : 'Batalkan verifikasi — status kembali ke diupload, alasan wajib dan tercatat di audit'
+                        }
+                    >
+                        <Undo2 className="mr-1 size-3" /> Batalkan Verifikasi
+                    </Button>
                 )}
             </td>
         </tr>
