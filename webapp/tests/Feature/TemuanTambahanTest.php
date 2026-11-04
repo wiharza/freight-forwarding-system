@@ -267,6 +267,66 @@ class TemuanTambahanTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Temuan #3 — alokasi ke invoice importir lain
+    // ------------------------------------------------------------------
+
+    #[Test]
+    public function alokasi_ditolak_bila_importir_pembayaran_berbeda_dari_invoice(): void
+    {
+        // Invoice milik importir B (company sama, importir beda)
+        $jobB = Job::factory()->create([
+            'company_id' => $this->company->id,
+            'importir_id' => $this->importirB->id,
+            'shipping_line_id' => $this->line->id,
+        ]);
+        $invoiceB = Invoice::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $jobB->id,
+            'importir_id' => $this->importirB->id,
+            'total_invoice' => 1000000,
+            'status' => Invoice::STATUS_DRAFT,
+        ]);
+        $itemB = $invoiceB->items()->create([
+            'description' => 'Jasa PPJK',
+            'blok' => 'c',
+            'total_line' => 1000000,
+        ]);
+
+        // Pembayaran tercatat untuk importir A (invoice milik A)
+        $invoiceA = Invoice::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'importir_id' => $this->importir->id,
+            'total_invoice' => 1000000,
+            'status' => Invoice::STATUS_DRAFT,
+        ]);
+        $payment = Payment::create([
+            'company_id' => $this->company->id,
+            'invoice_id' => $invoiceA->id,
+            'importir_id' => $this->importir->id,
+            'payment_date' => '2026-11-04',
+            'amount' => 1000000,
+            'method' => Payment::METHOD_TRANSFER,
+            'is_unallocated' => true,
+        ]);
+
+        // Coba alokasikan payment importir A ke invoice importir B
+        $response = $this->actingAs($this->finance)->post(
+            route('finance.payments.allocate', $payment->id),
+            [
+                'invoice_id' => $invoiceB->id,
+                'allocations' => [
+                    ['invoice_item_id' => $itemB->id, 'amount' => 500000, 'blok' => 'c'],
+                ],
+            ]
+        );
+
+        $response->assertSessionHasErrors(['invoice_id']);
+        $this->assertDatabaseCount('payment_allocations', 0);
+        $this->assertEquals(0, (float) $invoiceB->fresh()->total_paid);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

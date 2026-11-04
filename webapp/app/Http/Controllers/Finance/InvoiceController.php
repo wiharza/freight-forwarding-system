@@ -312,6 +312,18 @@ class InvoiceController extends Controller
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
             $invoice = Invoice::query()->lockForUpdate()->findOrFail($data['invoice_id']);
 
+            // TEMUAN #3 (2026-11-04): pembayaran hanya boleh dialokasikan ke
+            // invoice milik importir yang SAMA. Sebelumnya endpoint hanya
+            // memeriksa item milik invoice — payment importir A bisa
+            // dialokasikan ke invoice importir B tanpa jejak. Cek dilakukan
+            // di dalam transaksi setelah lock, sebelum baris apa pun dibuat,
+            // sehingga penolakan tidak menyisakan alokasi setengah jalan.
+            if ((int) $payment->importir_id !== (int) $invoice->importir_id) {
+                throw ValidationException::withMessages([
+                    'invoice_id' => 'Pembayaran ini milik importir lain dan tidak dapat dialokasikan ke invoice ini.',
+                ]);
+            }
+
             // Hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran
             // ini agar alokasi bertahap (batch terpisah) tidak bisa melampaui
             // nominal payment. Dana yang sudah dipindah ke Titipan Dana dari
