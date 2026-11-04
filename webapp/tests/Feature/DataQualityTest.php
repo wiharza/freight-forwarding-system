@@ -8,12 +8,13 @@ use App\Models\CustomsDeclaration;
 use App\Models\Importir;
 use App\Models\Job;
 use App\Models\Location;
-use App\Models\MfnTariff;
 use App\Models\ShippingLine;
 use App\Models\TaxExchangeRate;
 use App\Models\User;
 use App\Models\Vessel;
+use App\Support\CompanyContext;
 use App\Support\FormatRules;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -29,12 +30,19 @@ class DataQualityTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $admin;
+
     private User $cs;
+
     private User $customs;
+
     private User $customs2;
+
     private Importir $importir;
+
     private ShippingLine $line;
+
     private Location $pod;
 
     protected function setUp(): void
@@ -67,7 +75,7 @@ class DataQualityTest extends TestCase
             ContainerType::query()->create(['company_id' => $this->company->id, 'size' => $size, 'type' => $type]);
         }
 
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
     }
 
     private function jobPayload(array $overrides = []): array
@@ -163,7 +171,7 @@ class DataQualityTest extends TestCase
         $otherCompany = Company::factory()->create();
         // forceFill: company_id tidak fillable (diisi otomatis dari CompanyContext
         // oleh trait BelongsToCompany) — di sini kita sengaja menulis company lain.
-        $vessel = (new Vessel())->forceFill([
+        $vessel = (new Vessel)->forceFill([
             'company_id' => $otherCompany->id,
             'name' => 'KAPAL LAIN',
         ]);
@@ -463,7 +471,7 @@ class DataQualityTest extends TestCase
         ]);
 
         // Jumat 2026-11-06 masih dalam periode Rabu→Selasa
-        $rate = TaxExchangeRate::resolveRate('USD', \Carbon\Carbon::parse('2026-11-06'));
+        $rate = TaxExchangeRate::resolveRate('USD', Carbon::parse('2026-11-06'));
         $this->assertNotNull($rate);
         $this->assertEquals('15900.0000', (string) $rate->rate_to_idr); // decimal:4
     }

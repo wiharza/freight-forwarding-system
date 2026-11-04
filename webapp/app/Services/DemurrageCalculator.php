@@ -7,7 +7,6 @@ use App\Models\InternalExchangeRate;
 use App\Models\Job;
 use App\Models\LineTariff;
 use App\Models\Milestone;
-use App\Models\ShippingLine;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -304,7 +303,7 @@ class DemurrageCalculator
             ->where('effective_from', '<=', $effectiveDate->toDateString())
             ->where(function ($q) use ($effectiveDate) {
                 $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', $effectiveDate->toDateString());
+                    ->orWhere('effective_to', '>=', $effectiveDate->toDateString());
             })
             ->orderBy('day_from')
             ->get();

@@ -3,10 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
-use App\Models\Importir;
-use App\Models\Job;
-use App\Models\ShippingLine;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -17,8 +15,11 @@ class ReportTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $finance;
+
     private User $ops;
+
     private User $field;
 
     protected function setUp(): void
@@ -28,7 +29,7 @@ class ReportTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance = User::factory()->create(['company_id' => $this->company->id]);
         $this->finance->roles()->sync([$this->roleId('finance')]);

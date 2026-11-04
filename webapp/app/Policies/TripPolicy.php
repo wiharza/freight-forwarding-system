@@ -21,9 +21,12 @@ class TripPolicy
             return true;
         }
 
-        // Field hanya boleh melihat job/trip yang ditugaskan kepadanya
+        // Field hanya boleh melihat trip dari job yang ditugaskan kepadanya.
+        // (BUGFIX 2026-11-04: Trip tidak punya relasi fields() — panggilan
+        // lama $trip->fields() melempar BadMethodCallException untuk user
+        // Field murni. Penugasan Field tercatat di Job, bukan di Trip.)
         if ($user->hasRole(Role::FIELD)) {
-            return $trip->fields()->where('field_user_id', $user->id)->exists();
+            return $trip->job->fields()->where('field_user_id', $user->id)->exists();
         }
 
         return false;

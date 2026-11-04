@@ -11,10 +11,15 @@ class Role extends Model
     use HasFactory;
 
     public const ADMIN = 'admin';
+
     public const CS = 'cs';
+
     public const CUSTOMS_SPECIALIST = 'customs_specialist';
+
     public const OPS = 'ops';
+
     public const FIELD = 'field';
+
     public const FINANCE = 'finance';
 
     protected $fillable = [

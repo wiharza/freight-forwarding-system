@@ -27,11 +27,30 @@ class PibCalculator
     }
 
     /**
+     * Samakan kode HS ke digit murni untuk pencocokan tarif (BUGFIX 2026-11-04:
+     * tarif master tersimpan bertitik, mis. '3926.90.99', sedangkan input
+     * sudah dinormalisasi ke digit murni '39269099' oleh
+     * FormatRules::normalizeHsCode — where('hs_code', $digits) tidak pernah
+     * cocok sehingga BM selalu 0. Bandingkan digit lawan digit di kedua sisi;
+     * untuk HS 10 digit (BTKI + suffix CEISA) coba juga prefix 8 digit,
+     * karena suffix CEISA tidak mengubah tarif BTKI).
+     */
+    private static function applyHsMatch($query, string $hsDigits): void
+    {
+        $query->where(function ($q) use ($hsDigits) {
+            $q->whereRaw("REPLACE(REPLACE(hs_code, '.', ''), '-', '') = ?", [$hsDigits]);
+            if (strlen($hsDigits) === 10) {
+                $q->orWhereRaw("REPLACE(REPLACE(hs_code, '.', ''), '-', '') = ?", [substr($hsDigits, 0, 8)]);
+            }
+        });
+    }
+
+    /**
      * Hitung satu baris Seri Barang PIB (§3.2, Q28, Q30, Q32).
      */
     public function calculateItem(array $input, string $statusApi = 'API-U', ?string $ftaScheme = null, ?CarbonInterface $filingDate = null): array
     {
-        $hsCode = trim($input['hs_code']);
+        $hsCode = preg_replace('/[^0-9]/', '', trim($input['hs_code'])) ?? '';
         $fobValas = (float) ($input['fob_valas'] ?? 0);
         $freightValas = (float) ($input['freight_valas'] ?? 0);
         $currencyCode = strtoupper($input['currency_code'] ?? 'USD');
@@ -67,12 +86,13 @@ class PibCalculator
 
         if ($ftaScheme) {
             $ftaTariff = FtaTariff::query()
-                ->where('scheme_code', $ftaScheme)
-                ->where('hs_code', $hsCode)
+                ->where('scheme_code', $ftaScheme);
+            self::applyHsMatch($ftaTariff, $hsCode);
+            $ftaTariff = $ftaTariff
                 ->where('effective_from', '<=', $filingDate->toDateString())
                 ->where(function ($q) use ($filingDate) {
                     $q->whereNull('effective_to')
-                      ->orWhere('effective_to', '>=', $filingDate->toDateString());
+                        ->orWhere('effective_to', '>=', $filingDate->toDateString());
                 })
                 ->first();
 
@@ -86,12 +106,13 @@ class PibCalculator
         }
 
         if ($bmType === 'mfn') {
-            $mfnTariff = MfnTariff::query()
-                ->where('hs_code', $hsCode)
+            $mfnTariff = MfnTariff::query();
+            self::applyHsMatch($mfnTariff, $hsCode);
+            $mfnTariff = $mfnTariff
                 ->where('effective_from', '<=', $filingDate->toDateString())
                 ->where(function ($q) use ($filingDate) {
                     $q->whereNull('effective_to')
-                      ->orWhere('effective_to', '>=', $filingDate->toDateString());
+                        ->orWhere('effective_to', '>=', $filingDate->toDateString());
                 })
                 ->first();
 

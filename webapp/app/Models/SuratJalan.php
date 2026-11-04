@@ -6,15 +6,17 @@ use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class SuratJalan extends Model
 {
     use BelongsToCompany, HasFactory;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_PRINTED = 'printed';
+
     public const STATUS_SIGNED = 'signed';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [

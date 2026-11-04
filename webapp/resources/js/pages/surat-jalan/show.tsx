@@ -100,7 +100,7 @@ export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
                 <div className="flex flex-wrap gap-3">
                     {sj.status === 'draft' && <Button onClick={() => router.post(route('surat-jalan.sign', sj.id))}>Tandatangani (jadi POD)</Button>}
                     {sj.pod_file_path && (
-                        <a href={`/storage/${sj.pod_file_path}`} target="_blank" rel="noopener noreferrer">
+                        <a href={route('surat-jalan.pod.download', sj.id)} target="_blank" rel="noopener noreferrer">
                             <Button variant="outline">Lihat File POD</Button>
                         </a>
                     )}

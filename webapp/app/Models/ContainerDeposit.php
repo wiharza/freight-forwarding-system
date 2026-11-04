@@ -12,9 +12,13 @@ class ContainerDeposit extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_DITAHAN = 'ditahan';
+
     public const STATUS_KEMBALI_PENUH = 'dikembalikan_penuh';
+
     public const STATUS_KEMBALI_SEBAGIAN = 'dikembalikan_sebagian';
+
     public const STATUS_HANGUS_SEBAGIAN = 'hangus_sebagian';
+
     public const STATUS_HANGUS_PENUH = 'hangus_penuh';
 
     protected $fillable = [

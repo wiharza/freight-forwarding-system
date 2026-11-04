@@ -12,6 +12,7 @@ use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\ShippingLine;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -32,9 +33,13 @@ class BugfixRegressionTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $finance;
+
     private User $cs;
+
     private Importir $importir;
+
     private Job $job;
 
     protected function setUp(): void
@@ -44,7 +49,7 @@ class BugfixRegressionTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance = User::factory()->create(['company_id' => $this->company->id]);
         $this->finance->roles()->sync([$this->roleId('finance')]);

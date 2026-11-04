@@ -22,7 +22,7 @@ class InvoiceFactory extends Factory
             'company_id' => Company::factory(),
             'job_id' => Job::factory(),
             'importir_id' => Importir::factory(),
-            'invoice_number' => 'INV-2026-' . str_pad((string) $number, 6, '0', STR_PAD_LEFT),
+            'invoice_number' => 'INV-2026-'.str_pad((string) $number, 6, '0', STR_PAD_LEFT),
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(14)->toDateString(),
             'status' => Invoice::STATUS_DRAFT,

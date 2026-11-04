@@ -368,7 +368,7 @@ export default function InvoiceShow({ invoice }: { invoice: InvoiceDetail }) {
                                 disabled={allocForm.processing}
                                 onClick={() =>
                                     router.post(
-                                        route('payments.allocate', invoice.payments.find((p) => p.allocations.length === 0)!.id),
+                                        route('finance.payments.allocate', invoice.payments.find((p) => p.allocations.length === 0)!.id),
                                         allocForm.data,
                                         { onSuccess: () => allocForm.reset() },
                                     )

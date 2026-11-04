@@ -13,6 +13,7 @@ class TitipanDana extends Model
     use BelongsToCompany, HasFactory;
 
     public const METHOD_TRANSFER = 'transfer';
+
     public const METHOD_KAS = 'kas';
 
     protected $fillable = [

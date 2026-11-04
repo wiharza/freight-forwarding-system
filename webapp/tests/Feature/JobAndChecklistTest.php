@@ -9,9 +9,9 @@ use App\Models\ImportirChecklistOverride;
 use App\Models\Job;
 use App\Models\JobDocument;
 use App\Models\Location;
-use App\Models\Role;
 use App\Models\ShippingLine;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -24,11 +24,17 @@ class JobAndChecklistTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $cs;
+
     private User $ops;
+
     private User $field;
+
     private Importir $importir;
+
     private ShippingLine $line;
+
     private Location $pod;
 
     protected function setUp(): void
@@ -57,7 +63,7 @@ class JobAndChecklistTest extends TestCase
             ContainerType::query()->create(['company_id' => $this->company->id, 'size' => $size, 'type' => $type]);
         }
 
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
     }
 
     #[Test]

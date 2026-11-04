@@ -14,6 +14,7 @@ class MfnTariff extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_VERIFIED = 'terverifikasi';
+
     public const STATUS_UNVERIFIED = 'perlu_verifikasi';
 
     protected $fillable = [

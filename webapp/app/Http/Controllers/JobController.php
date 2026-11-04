@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Container;
 use App\Models\ContainerType;
 use App\Models\FtaTariff;
 use App\Models\Importir;
@@ -13,8 +12,10 @@ use App\Models\Role;
 use App\Models\ShippingLine;
 use App\Models\User;
 use App\Models\Vessel;
+use App\Services\DemurrageCalculator;
 use App\Support\Audit;
 use App\Support\FormatRules;
+use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class JobController extends Controller
 {
@@ -50,8 +52,8 @@ class JobController extends Controller
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->where('job_number', 'like', "%{$search}%")
-                  ->orWhere('bl_number', 'like', "%{$search}%")
-                  ->orWhere('vessel_name', 'like', "%{$search}%");
+                    ->orWhere('bl_number', 'like', "%{$search}%")
+                    ->orWhere('vessel_name', 'like', "%{$search}%");
             });
         }
 
@@ -139,7 +141,7 @@ class JobController extends Controller
             $vesselName = Vessel::query()->findOrFail($data['vessel_id'])->name;
         }
 
-        $jobNumber = 'JOB-' . date('Ym') . '-' . str_pad((string) (Job::query()->count() + 1), 4, '0', STR_PAD_LEFT);
+        $jobNumber = 'JOB-'.date('Ym').'-'.str_pad((string) (Job::query()->count() + 1), 4, '0', STR_PAD_LEFT);
 
         $job = Job::query()->create([
             'job_number' => $jobNumber,
@@ -183,7 +185,7 @@ class JobController extends Controller
         return redirect()->route('jobs.show', $job->id);
     }
 
-    public function show(Job $job, Request $request, \App\Services\DemurrageCalculator $calculator): Response
+    public function show(Job $job, Request $request, DemurrageCalculator $calculator): Response
     {
         Gate::authorize('view', $job);
 
@@ -235,7 +237,10 @@ class JobController extends Controller
             'metadata' => ['nullable', 'array'],
         ]);
 
-        $path = $request->file('file')->store("documents/{$job->company_id}/{$job->id}", 'public');
+        // HARDENING 2026-11-04: file disimpan di disk privat 'local', bukan
+        // 'public' — path lama documents/{company_id}/{job_id} bisa ditebak
+        // dan diunduh siapa pun lewat /storage/ tanpa login.
+        $path = $request->file('file')->store("documents/{$job->company_id}/{$job->id}", 'local');
 
         $document->update([
             'file_path' => $path,
@@ -254,6 +259,10 @@ class JobController extends Controller
     public function verifyDocument(Request $request, Job $job, JobDocument $document): RedirectResponse
     {
         Gate::authorize('verify_milestone');
+        // HARDENING 2026-11-04: verifikator juga harus punya akses ke Job ini
+        // (sebelumnya hanya ability global — Field yang tidak ditugaskan ke
+        // Job ini tetap bisa memverifikasi dokumennya).
+        Gate::authorize('view', $job);
 
         // BUGFIX: cek kepemilikan yang sama seperti uploadDocument
         if ((int) $document->job_id !== (int) $job->id) {
@@ -266,8 +275,29 @@ class JobController extends Controller
         return redirect()->back();
     }
 
+    /**
+     * Unduh file dokumen lewat endpoint ber-Gate (HARDENING 2026-11-04).
+     * File tersimpan di disk privat — tidak ada lagi URL /storage/ langsung.
+     */
+    public function downloadDocument(Request $request, Job $job, JobDocument $document): StreamedResponse
+    {
+        Gate::authorize('view', $job);
+
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
+
+        return PrivateFile::download($document->file_path, $document->file_name);
+    }
+
     public function updateProblemFlag(Request $request, Job $job): RedirectResponse
     {
+        // HARDENING 2026-11-04: sebelumnya TIDAK ada pemeriksaan akses sama
+        // sekali — user mana pun yang login bisa mengubah problem flag Job
+        // mana pun. Sekarang wajib lolos Gate view Job (Field hanya untuk
+        // Job yang ditugaskan kepadanya, sesuai JobPolicy).
+        Gate::authorize('view', $job);
+
         $data = $request->validate([
             'problem_flag' => ['nullable', Rule::in(['Hold', 'Dispute', 'Dokumen Bermasalah'])],
             'reason' => ['required_with:problem_flag', 'nullable', 'string'],

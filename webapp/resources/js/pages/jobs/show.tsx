@@ -737,9 +737,9 @@ export default function JobsShow({
                                     />
                                 </div>
 
-                                {['do_release', 'sppb'].includes(milestoneForm.data.milestone_type) && (
+                                {['do_release', 'sppb', 'pib_filed'].includes(milestoneForm.data.milestone_type) && (
                                     <div>
-                                        <Label htmlFor="m_proof_no">Nomor Dokumen (No DO / No SPPB)</Label>
+                                        <Label htmlFor="m_proof_no">Nomor Dokumen (No DO / No SPPB / No PIB)</Label>
                                         <Input
                                             id="m_proof_no"
                                             value={milestoneForm.data.proof_number}

@@ -2,26 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Container;
-use App\Models\ContainerType;
-use App\Models\FtaTariff;
-use App\Models\Importir;
 use App\Models\Job;
-use App\Models\JobDocument;
 use App\Models\Location;
-use App\Models\Role;
-use App\Models\ShippingLine;
-use App\Models\SuratJalan;
 use App\Models\Trip;
 use App\Models\Vendor;
-use App\Models\VendorInvoice;
-use App\Models\VendorRoute;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,7 +49,7 @@ class TripController extends Controller
         ]);
     }
 
-    public function store(Request $request): \Illuminate\Http\RedirectResponse
+    public function store(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'job_id' => ['required', 'exists:jobs,id'],
@@ -73,12 +62,15 @@ class TripController extends Controller
             'origin_location_id' => ['nullable', 'exists:locations,id'],
             'destination_location_id' => ['nullable', 'exists:locations,id'],
             'container_ids' => ['required', 'array', 'min:1'],
-            'container_ids.*' => ['exists:containers,id'],
+            // HARDENING 2026-11-04: kontainer HARUS milik Job trip ini.
+            'container_ids.*' => [Rule::exists('containers', 'id')->where('job_id', $request->input('job_id'))],
             'notes' => ['nullable', 'string'],
         ]);
 
-        $job = \App\Models\Job::query()->findOrFail($data['job_id']);
+        $job = Job::query()->findOrFail($data['job_id']);
         Gate::authorize('job_assignment');
+        // HARDENING 2026-11-04: pembuat trip juga harus punya akses ke Job-nya.
+        Gate::authorize('view', $job);
 
         $trip = Trip::query()->create([
             'company_id' => $request->user()->company_id,
@@ -100,13 +92,17 @@ class TripController extends Controller
             $trip->containers()->attach($cid, ['sequence' => $index + 1]);
         }
 
-        \App\Support\Audit::record('trip.created', $trip, ['job_number' => $trip->job->job_number], 'Penugasan trip trucking');
+        Audit::record('trip.created', $trip, ['job_number' => $trip->job->job_number], 'Penugasan trip trucking');
 
         return redirect()->route('trips.show', $trip->id);
     }
 
-    public function show(\App\Models\Trip $trip): \Inertia\Response
+    public function show(Trip $trip): Response
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate — siapa pun yang login
+        // bisa membuka detail trip (dan SJ + vendor invoice di dalamnya).
+        Gate::authorize('view', $trip);
+
         $trip->load([
             'job.importir',
             'job.shippingLine',
@@ -124,8 +120,11 @@ class TripController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, \App\Models\Trip $trip): \Illuminate\Http\RedirectResponse
+    public function updateStatus(Request $request, Trip $trip): RedirectResponse
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate.
+        Gate::authorize('view', $trip);
+
         $data = $request->validate([
             'status' => ['required', Rule::in([
                 Trip::STATUS_ASSIGNED,
@@ -144,7 +143,7 @@ class TripController extends Controller
             $trip->save();
         }
 
-        \App\Support\Audit::record('trip.status_changed', $trip, [
+        Audit::record('trip.status_changed', $trip, [
             'old_status' => $oldStatus,
             'new_status' => $trip->status,
         ], 'Perubahan status trip trucking');
@@ -152,8 +151,11 @@ class TripController extends Controller
         return redirect()->back();
     }
 
-    public function printSuratJalan(\App\Models\Trip $trip): \Illuminate\Http\RedirectResponse
+    public function printSuratJalan(Trip $trip): RedirectResponse
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate.
+        Gate::authorize('view', $trip);
+
         // Generate PDF Surat Jalan - akan diimplementasikan dengan DomPDF atau Browsershot
         // Untuk sekarang redirect ke halaman cetak
         return redirect()->route('trips.show', $trip);

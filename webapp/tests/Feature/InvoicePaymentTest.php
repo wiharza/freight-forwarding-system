@@ -6,12 +6,13 @@ use App\Models\Company;
 use App\Models\FinanceApprovalLimit;
 use App\Models\Importir;
 use App\Models\Invoice;
-use App\Models\InvoiceItem;
 use App\Models\Job;
 use App\Models\JobCost;
 use App\Models\Payment;
 use App\Models\ShippingLine;
+use App\Models\TitipanDana;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -23,10 +24,15 @@ class InvoicePaymentTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $finance1;
+
     private User $finance2;
+
     private User $ops;
+
     private Importir $importir;
+
     private Job $job;
 
     protected function setUp(): void
@@ -36,7 +42,7 @@ class InvoicePaymentTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance1 = User::factory()->create(['company_id' => $this->company->id]);
         $this->finance1->roles()->sync([$this->roleId('finance')]);
@@ -224,9 +230,45 @@ class InvoicePaymentTest extends TestCase
     #[Test]
     public function alokasi_sisa_tidak_dialokasi_jadi_titipan_dana(): void
     {
-        // Test bahwa sisa pembayaran tidak dialokasi otomatis jadi Titipan Dana
-        // (harus manual oleh Finance)
-        $this->assertTrue(true); // placeholder — logic sudah di Q22: sisa → Titipan Dana manual
+        // Q22: kelebihan bayar (invoice lunas penuh, pembayaran bersisa)
+        // WAJIB menjadi satu baris Titipan Dana untuk Importir itu — bukan
+        // disenyapkan, bukan dinetting ke invoice lain.
+        $invoice = Invoice::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'importir_id' => $this->importir->id,
+            'status' => Invoice::STATUS_LOCKED,
+            'total_invoice' => 10000000,
+            'total_paid' => 0,
+        ]);
+
+        $payment = Payment::create([
+            'company_id' => $this->company->id,
+            'invoice_id' => $invoice->id,
+            'importir_id' => $this->importir->id,
+            'payment_date' => '2026-11-10',
+            'amount' => 15000000,
+            'method' => Payment::METHOD_TRANSFER,
+            'is_unallocated' => true,
+        ]);
+
+        $response = $this->actingAs($this->finance1)->post(route('finance.payments.allocate', $payment->id), [
+            'invoice_id' => $invoice->id,
+            'allocations' => [
+                ['invoice_item_id' => null, 'amount' => 10000000, 'blok' => 'a'],
+            ],
+        ]);
+
+        $response->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('titipan_danas', [
+            'reference' => 'OVERPAY-PAY-'.$payment->id,
+            'importir_id' => $this->importir->id,
+            'amount' => 5000000,
+        ]);
+        $this->assertEquals(1, TitipanDana::query()->where('reference', 'OVERPAY-PAY-'.$payment->id)->count());
+        $this->assertFalse($payment->fresh()->is_unallocated);
+        $this->assertEquals(Invoice::STATUS_LOCKED, $invoice->fresh()->status);
     }
 
     #[Test]

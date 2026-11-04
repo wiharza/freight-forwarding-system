@@ -12,6 +12,7 @@ class Pph22Rule extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_VERIFIED = 'terverifikasi';
+
     public const STATUS_UNVERIFIED = 'perlu_verifikasi';
 
     protected $fillable = [
@@ -61,12 +62,12 @@ class Pph22Rule extends Model
 
         // 2. Coba prefix 4 digit (pos tarif Bab.Pos, e.g. 33.04 -> 3304)
         $prefix4 = substr($cleanHs, 0, 4);
-        $dotPrefix4 = substr($cleanHs, 0, 2) . '.' . substr($cleanHs, 2, 2);
+        $dotPrefix4 = substr($cleanHs, 0, 2).'.'.substr($cleanHs, 2, 2);
 
         return self::query()
             ->where(function ($q) use ($prefix4, $dotPrefix4) {
                 $q->where('hs_code', $dotPrefix4)
-                  ->orWhere('hs_code', $prefix4);
+                    ->orWhere('hs_code', $prefix4);
             })
             ->first();
     }

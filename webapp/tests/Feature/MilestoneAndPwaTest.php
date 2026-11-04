@@ -8,6 +8,7 @@ use App\Models\Importir;
 use App\Models\Job;
 use App\Models\Milestone;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -20,12 +21,19 @@ class MilestoneAndPwaTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $cs;
+
     private User $ops;
+
     private User $ops2;
+
     private User $field;
+
     private Job $job;
+
     private Container $c1;
+
     private Container $c2;
 
     protected function setUp(): void
@@ -48,7 +56,7 @@ class MilestoneAndPwaTest extends TestCase
         $this->field = User::factory()->create(['company_id' => $this->company->id]);
         $this->field->roles()->sync([$this->roleId('field')]);
 
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $importir = Importir::factory()->create(['company_id' => $this->company->id]);
 

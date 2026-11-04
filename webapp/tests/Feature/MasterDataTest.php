@@ -17,6 +17,7 @@ class MasterDataTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private User $admin;
+
     private User $cs;
 
     protected function setUp(): void

@@ -7,7 +7,7 @@ use App\Models\ShippingLine;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\ShippingLine>
+ * @extends Factory<ShippingLine>
  */
 class ShippingLineFactory extends Factory
 {

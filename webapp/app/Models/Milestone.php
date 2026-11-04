@@ -16,14 +16,21 @@ class Milestone extends Model
     use BelongsToCompany, HasFactory;
 
     public const BRANCH_PABEAN = 'pabean';
+
     public const BRANCH_LOGISTIK = 'logistik';
 
     public const TYPE_DISCHARGE = 'discharge';
+
     public const TYPE_DO_RELEASE = 'do_release';
+
     public const TYPE_PIB_FILED = 'pib_filed';
+
     public const TYPE_SPPB = 'sppb';
+
     public const TYPE_GATE_OUT_FULL = 'gate_out_full';
+
     public const TYPE_DELIVERED = 'delivered';
+
     public const TYPE_GATE_IN_EMPTY = 'gate_in_empty';
 
     protected $fillable = [
@@ -83,17 +90,30 @@ class Milestone extends Model
 
     /**
      * Validasi kronologis cabang (§2.2, Q15). Sistem MENOLAK pelanggaran.
+     * BUGFIX 2026-11-04: sebelumnya cek hanya membandingkan tanggal BILA
+     * pendahulu sudah ada — SPPB tanpa PIB, DO tanpa Discharge, dan
+     * Gate-Out tanpa DO semuanya lolos diam-diam. Sekarang pendahulu yang
+     * belum ada JUGA ditolak: milestone tidak boleh dicatat sebelum
+     * pendahulunya ada di cabang yang sama.
      */
     public static function assertValidChronology(Job $job, string $type, Carbon $occurredAt, ?int $containerId = null): void
     {
-        // 1. Cabang Pabean: SPPB tidak boleh sebelum PIB filed
-        if ($type === self::TYPE_SPPB) {
-            $pib = $job->milestones()
-                ->where('is_active', true)
-                ->where('milestone_type', self::TYPE_PIB_FILED)
-                ->first();
+        $active = fn (string $t) => $job->milestones()
+            ->where('is_active', true)
+            ->where('milestone_type', $t)
+            ->first();
 
-            if ($pib && $occurredAt->lt($pib->occurred_at)) {
+        // 1. Cabang Pabean: SPPB wajib didahului PIB filed
+        if ($type === self::TYPE_SPPB) {
+            $pib = $active(self::TYPE_PIB_FILED);
+
+            if (! $pib) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis cabang pabean: SPPB tidak dapat dicatat sebelum PIB Filed ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($pib->occurred_at)) {
                 throw ValidationException::withMessages([
                     'occurred_at' => "Validasi kronologis cabang pabean: Tanggal SPPB ({$occurredAt->format('Y-m-d H:i')}) tidak boleh mendahului tanggal PIB Filed ({$pib->occurred_at->format('Y-m-d H:i')}).",
                 ]);
@@ -101,54 +121,86 @@ class Milestone extends Model
         }
 
         // 2. Cabang Logistik:
-        // DO tidak boleh sebelum Discharge
+        // DO wajib didahului Discharge
         if ($type === self::TYPE_DO_RELEASE) {
-            $discharge = $job->milestones()
-                ->where('is_active', true)
-                ->where('milestone_type', self::TYPE_DISCHARGE)
-                ->first();
+            $discharge = $active(self::TYPE_DISCHARGE);
 
-            if ($discharge && $occurredAt->lt($discharge->occurred_at)) {
+            if (! $discharge) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis: DO Terbit tidak dapat dicatat sebelum Discharge/Bongkar ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($discharge->occurred_at)) {
                 throw ValidationException::withMessages([
                     'occurred_at' => "Validasi kronologis: Tanggal DO Terbit ({$occurredAt->format('Y-m-d H:i')}) tidak boleh mendahului tanggal Discharge/Bongkar ({$discharge->occurred_at->format('Y-m-d H:i')}).",
                 ]);
             }
         }
 
-        // Gate-Out Full tidak boleh sebelum DO terbit dan tidak boleh sebelum Discharge
+        // Gate-Out Full wajib didahului DO terbit dan Discharge
         if ($type === self::TYPE_GATE_OUT_FULL) {
-            $do = $job->milestones()
-                ->where('is_active', true)
-                ->where('milestone_type', self::TYPE_DO_RELEASE)
-                ->first();
+            $do = $active(self::TYPE_DO_RELEASE);
 
-            if ($do && $occurredAt->lt($do->occurred_at)) {
+            if (! $do) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis: Gate-Out Full tidak dapat dicatat sebelum DO Terbit ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($do->occurred_at)) {
                 throw ValidationException::withMessages([
                     'occurred_at' => "Validasi kronologis: Gate-Out Full ({$occurredAt->format('Y-m-d H:i')}) tidak boleh sebelum DO Terbit ({$do->occurred_at->format('Y-m-d H:i')}).",
                 ]);
             }
 
-            $discharge = $job->milestones()
-                ->where('is_active', true)
-                ->where('milestone_type', self::TYPE_DISCHARGE)
-                ->first();
+            $discharge = $active(self::TYPE_DISCHARGE);
 
-            if ($discharge && $occurredAt->lt($discharge->occurred_at)) {
+            if (! $discharge) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis: Gate-Out Full tidak dapat dicatat sebelum Discharge/Bongkar ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($discharge->occurred_at)) {
                 throw ValidationException::withMessages([
                     'occurred_at' => "Validasi kronologis: Gate-Out Full ({$occurredAt->format('Y-m-d H:i')}) tidak boleh mendahului tanggal Discharge ({$discharge->occurred_at->format('Y-m-d H:i')}).",
                 ]);
             }
         }
 
-        // Gate-In Empty tidak boleh sebelum Gate-Out Full pada kontainer yang sama
-        if ($type === self::TYPE_GATE_IN_EMPTY && $containerId) {
-            $gateOut = $job->milestones()
-                ->where('is_active', true)
-                ->where('container_id', $containerId)
-                ->where('milestone_type', self::TYPE_GATE_OUT_FULL)
-                ->first();
+        // Delivered (Terkirim) wajib didahului Gate-Out Full
+        if ($type === self::TYPE_DELIVERED) {
+            $gateOut = $containerId
+                ? $job->milestones()->where('is_active', true)->where('container_id', $containerId)->where('milestone_type', self::TYPE_GATE_OUT_FULL)->first()
+                : $active(self::TYPE_GATE_OUT_FULL);
 
-            if ($gateOut && $occurredAt->lt($gateOut->occurred_at)) {
+            if (! $gateOut) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis: Delivered tidak dapat dicatat sebelum Gate-Out Full ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($gateOut->occurred_at)) {
+                throw ValidationException::withMessages([
+                    'occurred_at' => "Validasi kronologis: Delivered ({$occurredAt->format('Y-m-d H:i')}) tidak boleh mendahului Gate-Out Full ({$gateOut->occurred_at->format('Y-m-d H:i')}).",
+                ]);
+            }
+        }
+
+        // Gate-In Empty wajib didahului Gate-Out Full pada kontainer yang sama
+        if ($type === self::TYPE_GATE_IN_EMPTY) {
+            $gateOut = $containerId
+                ? $job->milestones()->where('is_active', true)->where('container_id', $containerId)->where('milestone_type', self::TYPE_GATE_OUT_FULL)->first()
+                : $active(self::TYPE_GATE_OUT_FULL);
+
+            if (! $gateOut) {
+                throw ValidationException::withMessages([
+                    'milestone_type' => 'Validasi kronologis: Gate-In Empty tidak dapat dicatat sebelum Gate-Out Full ada di Job ini.',
+                ]);
+            }
+
+            if ($occurredAt->lt($gateOut->occurred_at)) {
                 throw ValidationException::withMessages([
                     'occurred_at' => "Validasi kronologis: Gate-In Empty ({$occurredAt->format('Y-m-d H:i')}) tidak boleh mendahului tanggal Gate-Out Full ({$gateOut->occurred_at->format('Y-m-d H:i')}) pada kontainer yang sama.",
                 ]);

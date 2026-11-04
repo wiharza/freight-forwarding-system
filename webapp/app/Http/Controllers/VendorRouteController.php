@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Location;
-use App\Models\Vendor;
 use App\Models\VendorRoute;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
@@ -55,6 +53,7 @@ class VendorRouteController extends Controller
     public function destroy(VendorRoute $route): RedirectResponse
     {
         $route->delete();
+
         return redirect()->back();
     }
 }

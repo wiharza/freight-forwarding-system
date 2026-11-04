@@ -12,6 +12,7 @@ class Vendor extends Model
     use BelongsToCompany, HasFactory;
 
     public const TYPE_EKSTERNAL = 'eksternal';
+
     public const TYPE_INTERNAL = 'internal';
 
     protected $fillable = [

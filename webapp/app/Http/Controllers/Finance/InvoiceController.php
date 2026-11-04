@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Finance;
 
 use App\Http\Controllers\Controller;
-use App\Models\FinanceApprovalLimit;
+use App\Models\CustomsDeclaration;
 use App\Models\Importir;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -42,14 +42,15 @@ class InvoiceController extends Controller
     {
         Gate::authorize('invoice');
 
-        // BUGFIX: kolom `is_billable` tidak ada di skema job_costs — query ini
-        // menggagalkan halaman di PostgreSQL. Kelayakan tagih dihitung dari
-        // payer_flag (lihat JobCost::isBillable()).
-        $job->load(['importir', 'shippingLine', 'costs' => fn ($q) => $q->where('payer_flag', '!=', JobCost::PAYER_IMPORTIR)]);
+        // HARDENING 2026-11-04: preview memakai SATU definisi billable yang
+        // sama dengan store() (Job::billableCosts) — sebelumnya filter preview
+        // dan submit berbeda, sehingga angka yang dilihat Finance belum tentu
+        // angka yang akhirnya ditagihkan.
+        $job->load(['importir', 'shippingLine']);
 
         return Inertia::render('finance/invoice-create', [
             'job' => $job,
-            'billableCosts' => $job->costs->filter(fn ($c) => $c->isBillable()),
+            'billableCosts' => $job->billableCosts()->get(),
         ]);
     }
 
@@ -67,7 +68,7 @@ class InvoiceController extends Controller
         ]);
 
         $importir = $job->importir;
-        $snapshot = \App\Models\CustomsDeclaration::query()
+        $snapshot = CustomsDeclaration::query()
             ->where('job_id', $job->id)
             ->where('status', '!=', 'draft')
             ->latest('version')
@@ -83,95 +84,130 @@ class InvoiceController extends Controller
         ];
         $blokATotal = $blokA['bm'] + $blokA['ppn_impor'] + $blokA['pph22'] + $blokA['ppnbm'] + $blokA['pungutan_lain'];
 
-        // Blok (b) — biaya pihak ketiga (pass-through tanpa markup)
-        $billableCosts = $job->costs()
-            ->where('payer_flag', '!=', 'importir_langsung')
-            ->where('cost_type', '!=', 'container_deposit_forfeit')
-            ->where('cost_type', '!=', 'ocean_freight') // hanya biaya selain freight
-            ->where('status', 'aktual')
-            ->get();
-
-        // BUGFIX: Blok (b) sebelumnya hardcoded 0 sehingga biaya billable tidak
-        // pernah masuk total invoice walau itemnya dibuat.
-        $blokBTotal = (float) $billableCosts->sum('amount_idr');
-        $blokBPPN = 0.0;
-
-        // Blok (c) — Jasa PPJK + PPN 12% × DPP 11/12
+        // Blok (c) — Jasa PPJK + PPN 12% × DPP 11/12 (murni fungsi input)
         $serviceFee = (float) $data['blok_c_service_fee'];
         $dppLain = round($serviceFee * (11 / 12), 4);
         $ppnRate = (float) $data['blok_c_ppn_rate'];
         $ppnJasa = round($dppLain * $ppnRate, 4);
 
-        $totalInvoice = $blokATotal + $blokBTotal + $serviceFee + $ppnJasa;
+        // SATU transaksi untuk: baca biaya billable (terkunci) -> buat invoice
+        // + items -> tandai biaya sudah ditagih. Bila ada langkah gagal
+        // (termasuk guard double-billing di bawah), semuanya batal.
+        // (HARDENING 2026-11-04.)
+        $invoice = DB::transaction(function () use ($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa) {
 
-        // Generate nomor invoice berurutan
-        $lastInvoice = Invoice::query()->orderByDesc('id')->first();
-        $nextNumber = $lastInvoice ? (int) filter_var($lastInvoice->invoice_number, FILTER_SANITIZE_NUMBER_INT) + 1 : 1;
-        $invoiceNumber = 'INV-' . date('Y') . '-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+            // Blok (b) — biaya pihak ketiga (pass-through tanpa markup).
+            // HARDENING 2026-11-04: daftar biaya dibaca ulang DI DALAM transaksi
+            // dengan row lock (Job::billableCosts — definisi yang SAMA dengan
+            // preview di create()). Biaya yang sudah ditagih invoice lain tidak
+            // bisa masuk dua kali: lock + guard whereNull('invoice_id') pada
+            // penandaan di bawah, plus hitung jumlah yang berhasil ditandai.
+            $billableCosts = $job->billableCosts()->lockForUpdate()->get();
 
-        $invoice = Invoice::query()->create([
-            'company_id' => $request->user()->company_id,
-            'job_id' => $job->id,
-            'importir_id' => $importir->id,
-            'invoice_number' => $invoiceNumber,
-            'invoice_date' => $data['invoice_date'],
-            'due_date' => $data['due_date'] ?? now()->addDays($importir->payment_terms_days ?? 14)->toDateString(),
-            'status' => Invoice::STATUS_DRAFT,
-            'blok_a_bm' => $blokA['bm'],
-            'blok_a_ppn_impor' => $blokA['ppn_impor'],
-            'blok_a_pph22' => $blokA['pph22'],
-            'blok_a_ppnbm' => $blokA['ppnbm'],
-            'blok_a_pungutan_lain' => $blokA['pungutan_lain'],
-            'blok_a_total' => $blokATotal,
-            'snapshot_pib_id' => $snapshot?->id,
-            'blok_b_total' => $blokBTotal,
-            'blok_b_ppn' => $blokBPPN,
-            'blok_c_service_fee' => $serviceFee,
-            'blok_c_dpp_lain' => $dppLain,
-            'blok_c_ppn_rate' => $ppnRate,
-            'blok_c_ppn' => $ppnJasa,
-            'total_invoice' => $totalInvoice,
-            'created_by_user_id' => $request->user()->id,
-            'faktur_pajak_number' => $data['faktur_pajak_number'] ?? null,
-            'notes' => $data['notes'] ?? null,
-        ]);
+            // BUGFIX: Blok (b) sebelumnya hardcoded 0 sehingga biaya billable tidak
+            // pernah masuk total invoice walau itemnya dibuat.
+            $blokBTotal = (float) $billableCosts->sum('amount_idr');
+            $blokBPPN = 0.0;
 
-        // Simpan invoice items dari billable costs
-        foreach ($billableCosts as $cost) {
+            $totalInvoice = $blokATotal + $blokBTotal + $serviceFee + $ppnJasa;
+
+            // Generate nomor invoice berurutan (BUGFIX 2026-11-04: filter_var dengan
+            // FILTER_SANITIZE_NUMBER_INT mempertahankan tanda '-' sehingga
+            // 'INV-2026-000001' menjadi (int)'-2026-000001' = -2026 dan setiap
+            // invoice setelah yang pertama bernomor 'INV-2026-0-2025' lalu
+            // menabrak unique constraint pada invoice ke-3. Ambil urutan dari
+            // digit terakhir nomor-nomor tahun berjalan, bukan dari string utuh.)
+            $year = date('Y');
+            $maxSequence = 0;
+            foreach (Invoice::query()->where('invoice_number', 'like', "INV-{$year}-%")->pluck('invoice_number') as $existing) {
+                if (preg_match('/(\d+)$/', $existing, $m)) {
+                    $maxSequence = max($maxSequence, (int) $m[1]);
+                }
+            }
+            $nextNumber = $maxSequence + 1;
+            $invoiceNumber = 'INV-'.$year.'-'.str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+
+            $invoice = Invoice::query()->create([
+                'company_id' => $request->user()->company_id,
+                'job_id' => $job->id,
+                'importir_id' => $importir->id,
+                'invoice_number' => $invoiceNumber,
+                'invoice_date' => $data['invoice_date'],
+                'due_date' => $data['due_date'] ?? now()->addDays($importir->payment_terms_days ?? 14)->toDateString(),
+                'status' => Invoice::STATUS_DRAFT,
+                'blok_a_bm' => $blokA['bm'],
+                'blok_a_ppn_impor' => $blokA['ppn_impor'],
+                'blok_a_pph22' => $blokA['pph22'],
+                'blok_a_ppnbm' => $blokA['ppnbm'],
+                'blok_a_pungutan_lain' => $blokA['pungutan_lain'],
+                'blok_a_total' => $blokATotal,
+                'snapshot_pib_id' => $snapshot?->id,
+                'blok_b_total' => $blokBTotal,
+                'blok_b_ppn' => $blokBPPN,
+                'blok_c_service_fee' => $serviceFee,
+                'blok_c_dpp_lain' => $dppLain,
+                'blok_c_ppn_rate' => $ppnRate,
+                'blok_c_ppn' => $ppnJasa,
+                'total_invoice' => $totalInvoice,
+                'created_by_user_id' => $request->user()->id,
+                'faktur_pajak_number' => $data['faktur_pajak_number'] ?? null,
+                'notes' => $data['notes'] ?? null,
+            ]);
+
+            // Simpan invoice items dari billable costs
+            foreach ($billableCosts as $cost) {
+                InvoiceItem::query()->create([
+                    'company_id' => $request->user()->company_id,
+                    'invoice_id' => $invoice->id,
+                    'job_cost_id' => $cost->id,
+                    'blok' => 'b',
+                    'description' => $cost->cost_type,
+                    'currency_code' => $cost->currency_code,
+                    'amount_valas' => $cost->amount_valas,
+                    'kurs' => $cost->kurs_internal_rate,
+                    'dpp' => $cost->amount_idr,
+                    'ppn_rate' => 0,
+                    'ppn_amount' => 0,
+                    'total_line' => $cost->amount_idr,
+                    'kena_ppn_jasa' => false,
+                ]);
+            }
+
+            // Blok (c) — Jasa PPJK
             InvoiceItem::query()->create([
                 'company_id' => $request->user()->company_id,
                 'invoice_id' => $invoice->id,
-                'job_cost_id' => $cost->id,
-                'blok' => 'b',
-                'description' => $cost->cost_type,
-                'currency_code' => $cost->currency_code,
-                'amount_valas' => $cost->amount_valas,
-                'kurs' => $cost->kurs_internal_rate,
-                'dpp' => $cost->amount_idr,
-                'ppn_rate' => 0,
-                'ppn_amount' => 0,
-                'total_line' => $cost->amount_idr,
-                'kena_ppn_jasa' => false,
+                'blok' => 'c',
+                'description' => 'Jasa PPJK (Service Fee)',
+                'currency_code' => 'IDR',
+                'amount_valas' => 0,
+                'kurs' => 1,
+                'dpp' => $dppLain,
+                'ppn_rate' => $ppnRate,
+                'ppn_amount' => $ppnJasa,
+                'total_line' => $serviceFee + $ppnJasa,
+                'kena_ppn_jasa' => true,
             ]);
-        }
 
-        // Blok (c) — Jasa PPJK
-        InvoiceItem::query()->create([
-            'company_id' => $request->user()->company_id,
-            'invoice_id' => $invoice->id,
-            'blok' => 'c',
-            'description' => 'Jasa PPJK (Service Fee)',
-            'currency_code' => 'IDR',
-            'amount_valas' => 0,
-            'kurs' => 1,
-            'dpp' => $dppLain,
-            'ppn_rate' => $ppnRate,
-            'ppn_amount' => $ppnJasa,
-            'total_line' => $serviceFee + $ppnJasa,
-            'kena_ppn_jasa' => true,
-        ]);
+            // Tandai biaya sudah ditagih (HARDENING 2026-11-04): tanpa ini satu
+            // JobCost bisa masuk invoice kedua. Guard whereNull('invoice_id')
+            // + hitung baris yang berhasil ditandai — bila ada biaya yang sempat
+            // ditagih proses lain di antara baca dan tandai, transaksi dibatalkan.
+            $marked = $job->costs()
+                ->whereIn('id', $billableCosts->pluck('id'))
+                ->whereNull('invoice_id')
+                ->update(['invoice_id' => $invoice->id, 'invoiced_at' => now()]);
 
-        Audit::record('invoice.created', $invoice, ['invoice_number' => $invoiceNumber], 'Pembuatan draf invoice');
+            if ($marked !== $billableCosts->count()) {
+                throw ValidationException::withMessages([
+                    'job' => 'Sebagian biaya sudah ditagih pada invoice lain — muat ulang halaman dan periksa kembali sebelum membuat invoice.',
+                ]);
+            }
+
+            Audit::record('invoice.created', $invoice, ['invoice_number' => $invoiceNumber], 'Pembuatan draf invoice');
+
+            return $invoice;
+        });
 
         return redirect()->route('finance.invoices.show', $invoice->id);
     }
@@ -254,25 +290,43 @@ class InvoiceController extends Controller
             'allocations.*.reason' => ['nullable', 'string'],
         ]);
 
-        $invoice = Invoice::query()->findOrFail($data['invoice_id']);
+        // HARDENING 2026-11-04 (race alokasi): seluruh baca saldo + tulis
+        // alokasi berjalan dalam SATU transaksi dengan row lock pada payment,
+        // invoice, dan item yang dialokasi. Sebelumnya saldo dibaca DI LUAR
+        // transaksi tanpa lock — dua request bersamaan bisa sama-sama melihat
+        // sisa penuh dan sama-sama mengalokasi, sehingga total alokasi
+        // melampaui nominal pembayaran. DB::transaction() juga memastikan
+        // rollback untuk SEMUA exception, bukan hanya ValidationException
+        // (kode lama membiarkan transaksi menggantung bila exception lain
+        // terjadi di tengah jalan).
+        return DB::transaction(function () use ($request, $payment, $data) {
+            // Kunci baris dulu — request lain yang menyentuh payment/invoice
+            // yang sama menunggu di sini sampai transaksi ini selesai.
+            $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
+            $invoice = Invoice::query()->lockForUpdate()->findOrFail($data['invoice_id']);
 
-        // BUGFIX: hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran ini
-        // agar alokasi bertahap (batch terpisah) tidak bisa melampaui nominal payment.
-        $previouslyAllocated = (float) $payment->allocations()->sum('amount');
-        $sisaPayment = (float) $payment->amount - $previouslyAllocated;
+            // Hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran
+            // ini agar alokasi bertahap (batch terpisah) tidak bisa melampaui
+            // nominal payment. Dana yang sudah dipindah ke Titipan Dana dari
+            // pembayaran ini (kelebihan bayar, Q22) tidak boleh dialokasikan
+            // dua kali — kurangi dari sisa yang bisa dialokasi.
+            $previouslyAllocated = (float) $payment->allocations()->sum('amount');
+            $existingTitipan = TitipanDana::query()
+                ->where('reference', 'OVERPAY-PAY-'.$payment->id)
+                ->get()
+                ->sum(fn ($t) => $t->sisaSaldo());
+            $sisaPayment = (float) $payment->amount - $previouslyAllocated - (float) $existingTitipan;
 
-        DB::beginTransaction();
-        try {
             $totalAllocatedThisRequest = 0;
 
             foreach ($data['allocations'] as $alloc) {
                 // Batas: alokasi per baris tidak boleh melebihi sisa tagihan baris
                 if (isset($alloc['invoice_item_id'])) {
-                    $item = InvoiceItem::query()->findOrFail($alloc['invoice_item_id']);
+                    $item = InvoiceItem::query()->lockForUpdate()->findOrFail($alloc['invoice_item_id']);
                     // Pastikan item milik invoice yang dituju
                     if ((int) $item->invoice_id !== (int) $invoice->id) {
                         throw ValidationException::withMessages([
-                            'allocations' => "Item invoice tidak cocok dengan invoice yang dipilih.",
+                            'allocations' => 'Item invoice tidak cocok dengan invoice yang dipilih.',
                         ]);
                     }
                     $sisaBaris = (float) $item->total_line - (float) $item->allocations()->sum('amount');
@@ -301,16 +355,47 @@ class InvoiceController extends Controller
             // Batas: total alokasi KUMULATIF tidak boleh melebihi jumlah pembayaran
             if ($totalAllocatedThisRequest > $sisaPayment) {
                 throw ValidationException::withMessages([
-                    'allocations' => "Total alokasi melebihi sisa dana pembayaran (tersisa Rp " . number_format($sisaPayment, 0, ',', '.') . ").",
+                    'allocations' => 'Total alokasi melebihi sisa dana pembayaran (tersisa Rp '.number_format($sisaPayment, 0, ',', '.').').',
                 ]);
             }
 
-            // Update invoice total_paid
+            // Update invoice total_paid (baris invoice sudah terkunci).
             $invoice->total_paid = (float) $invoice->total_paid + $totalAllocatedThisRequest;
             $invoice->save();
 
+            // Titipan Dana (Q22, T6 — BUGFIX 2026-11-04): Titipan Dana HANYA
+            // terbentuk dari kelebihan bayar, yaitu saat invoice sudah lunas
+            // penuh tetapi pembayaran masih bersisa. Sisa alokasi sebagian
+            // (invoice belum lunas) TIDAK menjadi Titipan Dana — dana itu
+            // masih bisa dialokasikan pada batch berikutnya. Idempotent per
+            // payment lewat reference, supaya batch susulan tidak menduplikasi.
+            $titipan = null;
+            $sisaSetelahAlokasi = round((float) $payment->amount - ($previouslyAllocated + $totalAllocatedThisRequest), 4);
+            if ($invoice->sisaTagihan() <= 0 && $sisaSetelahAlokasi > 0) {
+                $titipan = TitipanDana::query()->firstOrCreate(
+                    ['reference' => 'OVERPAY-PAY-'.$payment->id],
+                    [
+                        'company_id' => $request->user()->company_id,
+                        'importir_id' => $invoice->importir_id,
+                        'received_date' => $payment->payment_date,
+                        'amount' => $sisaSetelahAlokasi,
+                        'allocated_amount' => 0,
+                        'method' => $payment->method,
+                        'notes' => "Kelebihan bayar payment #{$payment->id} untuk invoice {$invoice->invoice_number} (Q22).",
+                        'created_by_user_id' => $request->user()->id,
+                    ]
+                );
+
+                Audit::record('titipan_dana.created', $titipan, [
+                    'payment_id' => $payment->id,
+                    'invoice_id' => $invoice->id,
+                    'amount' => $sisaSetelahAlokasi,
+                ], 'Kelebihan bayar menjadi Titipan Dana Importir');
+            }
+
             // Tandai payment sudah teralokasi penuh jika sisa habis
-            if (($previouslyAllocated + $totalAllocatedThisRequest) >= (float) $payment->amount) {
+            $accounted = $previouslyAllocated + $totalAllocatedThisRequest + ($titipan ? (float) $titipan->amount : 0);
+            if ($accounted >= (float) $payment->amount) {
                 $payment->update(['is_unallocated' => false]);
             }
 
@@ -324,13 +409,8 @@ class InvoiceController extends Controller
                 'total_allocated' => $totalAllocatedThisRequest,
             ], 'Alokasi pembayaran ke baris invoice');
 
-            DB::commit();
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            throw $e;
-        }
-
-        return redirect()->back();
+            return redirect()->back();
+        });
     }
 
     /**
@@ -351,6 +431,18 @@ class InvoiceController extends Controller
                 ->whereHas('job', fn ($q) => $q->where('importir_id', $imp->id))
                 ->sum('amount');
 
+            // BUGFIX 2026-11-04: lihat ReportController::exposurePerImportir —
+            // eksposur lama hanya menghitung JobCost (sumber Blok B) sehingga
+            // importir yang sudah lunas penuh tampil NEGATIF. Tambahkan Blok
+            // (a) pungutan negara dan Blok (c) jasa yang sudah ditagihkan;
+            // batasi bawah 0. (Rumus yang sama dipakai di dua controller ini;
+            // bila berubah, ubah keduanya.)
+            $totalBilledBlocks = Invoice::query()
+                ->where('importir_id', $imp->id)
+                ->where('status', '!=', Invoice::STATUS_CANCELLED)
+                ->get()
+                ->sum(fn ($inv) => (float) $inv->blok_a_total + (float) $inv->blok_c_service_fee + (float) $inv->blok_c_ppn);
+
             $titipanDana = TitipanDana::query()
                 ->where('importir_id', $imp->id)
                 ->get()
@@ -359,7 +451,7 @@ class InvoiceController extends Controller
             return [
                 'importir_id' => $imp->id,
                 'importir_name' => $imp->name,
-                'exposure_bruto' => $totalRealCost - $totalAllocated,
+                'exposure_bruto' => max(0, (float) $totalRealCost + $totalBilledBlocks - (float) $totalAllocated),
                 'titipan_dana_saldo' => $titipanDana,
             ];
         });

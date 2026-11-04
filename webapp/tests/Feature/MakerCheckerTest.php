@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Support\MakerChecker;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
@@ -18,7 +19,7 @@ class MakerCheckerTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $record = new class extends \Illuminate\Database\Eloquent\Model
+        $record = new class extends Model
         {
             protected $table = 'jobs';
         };
@@ -35,7 +36,7 @@ class MakerCheckerTest extends TestCase
         $creator = User::factory()->create();
         $approver = User::factory()->create();
 
-        $record = new class extends \Illuminate\Database\Eloquent\Model
+        $record = new class extends Model
         {
             protected $table = 'jobs';
         };

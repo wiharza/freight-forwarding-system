@@ -4,16 +4,19 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Container;
+use App\Models\Importir;
 use App\Models\Job;
 use App\Models\Location;
+use App\Models\ShippingLine;
 use App\Models\SuratJalan;
 use App\Models\Trip;
+use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorRoute;
-use App\Models\User;
-use Carbon\Carbon;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
 use Tests\TestCase;
@@ -23,12 +26,19 @@ class TruckingAndSuratJalanTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $ops;
+
     private User $field;
+
     private Job $job;
+
     private Container $c1;
+
     private Container $c2;
+
     private Vendor $vendor;
+
     private VendorRoute $route;
 
     protected function setUp(): void
@@ -38,7 +48,7 @@ class TruckingAndSuratJalanTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->ops = User::factory()->create(['company_id' => $this->company->id]);
         $this->ops->roles()->sync([$this->roleId('ops')]);
@@ -49,8 +59,8 @@ class TruckingAndSuratJalanTest extends TestCase
         $this->field = User::factory()->create(['company_id' => $this->company->id]);
         $this->field->roles()->sync([$this->roleId('field')]);
 
-        $importir = \App\Models\Importir::factory()->create(['company_id' => $this->company->id]);
-        $line = \App\Models\ShippingLine::factory()->create(['company_id' => $this->company->id]);
+        $importir = Importir::factory()->create(['company_id' => $this->company->id]);
+        $line = ShippingLine::factory()->create(['company_id' => $this->company->id]);
 
         $this->job = Job::factory()->create([
             'company_id' => $this->company->id,
@@ -198,8 +208,8 @@ class TruckingAndSuratJalanTest extends TestCase
         $response = $this->actingAs($this->ops)->post(route('surat-jalan.store', ['trip' => $trip->id]), $payload);
 
         $response->assertSessionHasNoErrors();
-        $sj = \App\Models\SuratJalan::where('sj_number', 'SJ-001')->firstOrFail();
-        $this->assertEquals(\App\Models\SuratJalan::STATUS_DRAFT, $sj->status);
+        $sj = SuratJalan::where('sj_number', 'SJ-001')->firstOrFail();
+        $this->assertEquals(SuratJalan::STATUS_DRAFT, $sj->status);
         $this->assertEquals('Budi Santoso', $sj->driver_name);
         $this->assertEquals('B 1234 ABC', $sj->vehicle_number);
     }
@@ -207,7 +217,7 @@ class TruckingAndSuratJalanTest extends TestCase
     #[Test]
     public function surat_jalan_dapat_ditandatangani_dan_menjadi_pod(): void
     {
-        $sj = \App\Models\SuratJalan::factory()->create([
+        $sj = SuratJalan::factory()->create([
             'company_id' => $this->company->id,
             'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id])->id,
             'sj_number' => 'SJ-001',
@@ -217,14 +227,14 @@ class TruckingAndSuratJalanTest extends TestCase
             'vehicle_number' => 'B 1234 ABC',
             'origin_address' => 'Tanjung Priok',
             'destination_address' => 'Gudang Importir',
-            'status' => \App\Models\SuratJalan::STATUS_DRAFT,
+            'status' => SuratJalan::STATUS_DRAFT,
         ]);
 
         $response = $this->actingAs($this->ops)->post(route('surat-jalan.sign', $sj->id));
 
         $response->assertSessionHasNoErrors();
         $sj->refresh();
-        $this->assertEquals(\App\Models\SuratJalan::STATUS_SIGNED, $sj->status);
+        $this->assertEquals(SuratJalan::STATUS_SIGNED, $sj->status);
         $this->assertNotNull($sj->pod_signed_at);
         $this->assertDatabaseHas('audit_trails', [
             'action' => 'surat_jalan.signed',
@@ -234,16 +244,16 @@ class TruckingAndSuratJalanTest extends TestCase
     #[Test]
     public function pod_bisa_diupload_sebagai_bukti_terkirim(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
-        $sj = \App\Models\SuratJalan::factory()->create([
+        $sj = SuratJalan::factory()->create([
             'company_id' => $this->company->id,
             'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id])->id,
             'sj_number' => 'SJ-001',
-            'status' => \App\Models\SuratJalan::STATUS_DRAFT,
+            'status' => SuratJalan::STATUS_DRAFT,
         ]);
 
-        $file = \Illuminate\Http\UploadedFile::fake()->create('pod_sj001.jpg', 500, 'image/jpeg');
+        $file = UploadedFile::fake()->create('pod_sj001.jpg', 500, 'image/jpeg');
 
         $response = $this->actingAs($this->ops)->post(route('surat-jalan.upload-pod', $sj->id), [
             'file' => $file,
@@ -253,23 +263,23 @@ class TruckingAndSuratJalanTest extends TestCase
         $sj->refresh();
 
         $this->assertNotNull($sj->pod_file_path);
-        $this->assertEquals(\App\Models\SuratJalan::STATUS_SIGNED, $sj->status);
+        $this->assertEquals(SuratJalan::STATUS_SIGNED, $sj->status);
         $this->assertDatabaseHas('audit_trails', [
             'action' => 'surat_jalan.pod_uploaded',
         ]);
     }
 
-#[Test]
+    #[Test]
     public function vendor_route_dibuat_dengan_harga_per_rute_per_ukuran(): void
     {
-        $port = \App\Models\Location::factory()->create([
+        $port = Location::factory()->create([
             'company_id' => $this->company->id,
-            'type' => \App\Models\Location::TYPE_PORT,
+            'type' => Location::TYPE_PORT,
             'name' => 'Tanjung Priok',
         ]);
-        $gudang = \App\Models\Location::factory()->create([
+        $gudang = Location::factory()->create([
             'company_id' => $this->company->id,
-            'type' => \App\Models\Location::TYPE_WAREHOUSE,
+            'type' => Location::TYPE_WAREHOUSE,
             'name' => 'Gudang Utama',
         ]);
 
@@ -288,7 +298,7 @@ class TruckingAndSuratJalanTest extends TestCase
         $response->assertSessionHasNoErrors();
 
         // Verify route was created with correct values (SQLite stores dates with time suffix)
-        $route = \App\Models\VendorRoute::query()
+        $route = VendorRoute::query()
             ->where('vendor_id', $this->vendor->id)
             ->where('container_size', '40')
             ->where('include_toll', true)

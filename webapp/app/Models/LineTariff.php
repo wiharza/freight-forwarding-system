@@ -14,10 +14,13 @@ class LineTariff extends Model
     use BelongsToCompany, HasFactory;
 
     public const TYPE_DEMURRAGE = 'demurrage';
+
     public const TYPE_DETENTION = 'detention';
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ARCHIVED = 'archived';
 
     protected $fillable = [

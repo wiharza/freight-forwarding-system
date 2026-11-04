@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\Role;
 use App\Models\User;
+use App\Support\CompanyContext;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -19,6 +20,16 @@ class DatabaseSeeder extends Seeder
         $company = Company::query()->firstOrCreate(
             ['name' => 'PPJK Induk'],
         );
+
+        // HARDENING 2026-11-04: kunci tenant demo secara eksplisit SEBELUM
+        // memanggil sub-seeder. MasterDataSeeder dan LegalTariffSeeder
+        // menentukan tenant lewat CompanyContext::id(), yang bila belum
+        // di-set fallback-nya adalah company dengan id TERENDAH (min('id')).
+        // Bila database sudah berisi company lain dengan id lebih rendah,
+        // data demo mendarat di tenant yang salah — sementara user demo di
+        // atas dibuat di 'PPJK Induk'. Dengan set() ini, seluruh seed demo
+        // dijamin satu tenant dengan user-nya, apa pun isi database sebelumnya.
+        app(CompanyContext::class)->set($company->id);
 
         // 6 peran kanonik (§2.5).
         $roles = collect([
