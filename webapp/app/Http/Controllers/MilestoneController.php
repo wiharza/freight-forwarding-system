@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Job;
 use App\Models\Milestone;
+use App\Services\FreeTimeAlertService;
 use App\Services\JobClose;
 use App\Support\Audit;
 use App\Support\PrivateFile;
@@ -11,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -114,6 +116,20 @@ class MilestoneController extends Controller
 
         $job->recomputeStatus();
 
+        // Alarm Free Time (§2.6, Q8, Tiket 15): discharge / gate-out bisa
+        // menggeser last free date — evaluasi ulang pemicu Job ini. Hanya
+        // pemicu yang tanggalnya sudah tiba dan belum pernah berbunyi yang
+        // terkirim (idempotent, lihat FreeTimeAlertService). Kegagalan
+        // notifikasi TIDAK BOLEH menggagalkan pencatatan milestone.
+        try {
+            app(FreeTimeAlertService::class)->checkForJob($job);
+        } catch (\Throwable $e) {
+            Log::warning('Evaluasi alarm Free Time gagal setelah milestone dicatat', [
+                'job_id' => $job->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->back();
     }
 
@@ -155,6 +171,17 @@ class MilestoneController extends Controller
             'proof_number' => $milestone->proof_number,
             'proof_file_path' => $milestone->proof_file_path,
         ], $request->user(), $data['reason']);
+
+        // Koreksi tanggal bisa menggeser last free date (§2.6, Q8) — sama
+        // seperti store, evaluasi ulang; kegagalan tidak menggagalkan koreksi.
+        try {
+            app(FreeTimeAlertService::class)->checkForJob($milestone->job);
+        } catch (\Throwable $e) {
+            Log::warning('Evaluasi alarm Free Time gagal setelah koreksi milestone', [
+                'job_id' => $milestone->job_id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()->back();
     }
