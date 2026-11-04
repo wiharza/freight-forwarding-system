@@ -23,5 +23,5 @@ Homestead.json
 Homestead.yaml
 npm-debug.log
 yarn-error.log
-webapp/test-results/
-webapp/playwright-report/
+test-results/
+playwright-report/

@@ -34,3 +34,6 @@ yarn-error.log*
 # Temporary files & caches
 .phpunit.result.cache
 *.tmp
+
+# Git bundle cadangan lokal (jangan ikut repo)
+*.bundle

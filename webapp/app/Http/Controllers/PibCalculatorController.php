@@ -160,6 +160,14 @@ class PibCalculatorController extends Controller
     {
         Gate::authorize('approve_snapshot');
 
+        // AUDIT P1-1: deklarasi harus milik Job pada URL. Tanpa ini, draf milik
+        // Job A dapat di-approve lewat URL Job B — gerbang FTA (Q19) dievaluasi
+        // terhadap Job yang salah dan blokir ADR-0008/override bisa dilewati.
+        if ((int) $declaration->job_id !== (int) $job->id) {
+            abort(404, 'Deklarasi tidak ditemukan pada Job ini.');
+        }
+        Gate::authorize('view', $job);
+
         MakerChecker::assertApproverDiffers($request->user(), $declaration);
 
         // ADR 0008 (temuan #2, 2026-11-04): Snapshot PIB TIDAK BOLEH

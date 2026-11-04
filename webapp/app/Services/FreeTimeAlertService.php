@@ -45,6 +45,13 @@ class FreeTimeAlertService
         $summary = ['jobs' => 0, 'containers' => 0, 'alerts' => 0, 'errors' => 0];
 
         foreach (Company::query()->orderBy('id')->get() as $company) {
+            // AUDIT P1-2: Job & relasinya membawa global scope BelongsToCompany yang
+            // membaca CompanyContext. Di konteks console tidak ada middleware yang
+            // men-set context, sehingga scope jatuh ke company pertama (min id) dan
+            // alarm diam-diam tidak pernah berbunyi untuk tenant lain. Set context
+            // eksplisit per company untuk setiap iterasi.
+            app(\App\Support\CompanyContext::class)->set($company->id);
+
             $jobs = Job::query()
                 ->where('company_id', $company->id)
                 ->where('cached_status', '!=', Job::STATUS_CLOSED)

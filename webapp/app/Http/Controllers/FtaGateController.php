@@ -11,6 +11,7 @@ use App\Models\FtaTariff;
 use App\Models\Job;
 use App\Models\JobDocument;
 use App\Services\FtaGate;
+use App\Services\JobClose;
 use App\Services\PibCalculator;
 use App\Support\Audit;
 use App\Support\FormatRules;
@@ -42,6 +43,12 @@ class FtaGateController extends Controller
     public function storeForm(Request $request, Job $job): RedirectResponse
     {
         Gate::authorize('fta_form');
+        // AUDIT P3-5: konsistensi defense-in-depth dengan endpoint Job-scoped lain.
+        Gate::authorize('view', $job);
+        // AUDIT P2-3: Job Closed adalah kunci tulis — storeForm menimpa
+        // fta_forms.file_path dan me-reset status dokumen form_fta pada
+        // checklist, jadi harus ditolak seperti upload dokumen biasa.
+        JobClose::assertNotClosed($job);
 
         $data = $request->validate([
             'scheme_code' => ['required', 'string', 'in:'.implode(',', array_keys(FtaTariff::SCHEMES))],

@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Company;
 use App\Models\Job;
 use App\Services\DemurrageCalculator;
+use App\Support\CompanyContext;
 use Illuminate\Console\Command;
 
 class RecalculateDemurrageCommand extends Command
@@ -16,23 +18,30 @@ class RecalculateDemurrageCommand extends Command
     {
         $this->info('Memulai perhitungan harian Demurrage & Detention jam 00:00...');
 
-        // Ambil semua Job aktif yang belum Closed
-        $activeJobs = Job::query()
-            ->where('cached_status', '!=', Job::STATUS_CLOSED)
-            ->where('cached_status', '!=', Job::STATUS_DRAFT)
-            ->with(['shippingLine', 'containers', 'milestones'])
-            ->get();
-
         $processedCount = 0;
         $overdueCount = 0;
 
-        foreach ($activeJobs as $job) {
-            $jobCalc = $calculator->calculateForJob($job);
+        // AUDIT: global scope BelongsToCompany membaca CompanyContext yang di
+        // konteks console jatuh ke company pertama (min id) — tenant lain
+        // terlewati diam-diam. Iterasi eksplisit per company dengan context di-set.
+        foreach (Company::query()->orderBy('id')->get() as $company) {
+            app(CompanyContext::class)->set($company->id);
 
-            foreach ($jobCalc['containers'] as $res) {
-                $processedCount++;
-                if ($res['total_usd'] > 0) {
-                    $overdueCount++;
+            $activeJobs = Job::query()
+                ->where('company_id', $company->id)
+                ->where('cached_status', '!=', Job::STATUS_CLOSED)
+                ->where('cached_status', '!=', Job::STATUS_DRAFT)
+                ->with(['shippingLine', 'containers', 'milestones'])
+                ->get();
+
+            foreach ($activeJobs as $job) {
+                $jobCalc = $calculator->calculateForJob($job);
+
+                foreach ($jobCalc['containers'] as $res) {
+                    $processedCount++;
+                    if ($res['total_usd'] > 0) {
+                        $overdueCount++;
+                    }
                 }
             }
         }
