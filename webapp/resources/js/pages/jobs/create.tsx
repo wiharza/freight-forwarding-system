@@ -301,8 +301,9 @@ export default function JobsCreate({
                             {data.containers.map((c, idx) => (
                                 <div key={idx} className="grid gap-3 sm:grid-cols-6 items-end rounded-lg border p-3 bg-muted/20">
                                     <div className="sm:col-span-2">
-                                        <Label className="text-xs">Nomor Kontainer</Label>
+                                        <Label htmlFor={`container_number_${idx}`} className="text-xs">Nomor Kontainer</Label>
                                         <Input
+                                            id={`container_number_${idx}`}
                                             value={c.container_number}
                                             onChange={(e) => updateContainer(idx, 'container_number', e.target.value)}
                                             placeholder="Contoh: MSKU1234567"
@@ -310,8 +311,9 @@ export default function JobsCreate({
                                         />
                                     </div>
                                     <div>
-                                        <Label className="text-xs">Ukuran</Label>
+                                        <Label htmlFor={`container_size_${idx}`} className="text-xs">Ukuran</Label>
                                         <select
+                                            id={`container_size_${idx}`}
                                             className="w-full border rounded-md p-2 text-sm bg-background mt-1"
                                             value={c.size}
                                             onChange={(e) => {
@@ -335,8 +337,9 @@ export default function JobsCreate({
                                         </select>
                                     </div>
                                     <div>
-                                        <Label className="text-xs">Tipe</Label>
+                                        <Label htmlFor={`container_type_${idx}`} className="text-xs">Tipe</Label>
                                         <select
+                                            id={`container_type_${idx}`}
                                             className="w-full border rounded-md p-2 text-sm bg-background mt-1"
                                             value={c.type}
                                             onChange={(e) => updateContainer(idx, 'type', e.target.value)}
@@ -350,8 +353,9 @@ export default function JobsCreate({
                                         )}
                                     </div>
                                     <div>
-                                        <Label className="text-xs">No. Seal</Label>
+                                        <Label htmlFor={`container_seal_${idx}`} className="text-xs">No. Seal</Label>
                                         <Input
+                                            id={`container_seal_${idx}`}
                                             value={c.seal_number}
                                             onChange={(e) => updateContainer(idx, 'seal_number', e.target.value)}
                                             placeholder="Seal No."
@@ -359,8 +363,9 @@ export default function JobsCreate({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1">
-                                            <Label className="text-xs">Berat (KG)</Label>
+                                            <Label htmlFor={`container_weight_${idx}`} className="text-xs">Berat (KG)</Label>
                                             <Input
+                                                id={`container_weight_${idx}`}
                                                 type="number"
                                                 value={c.gross_weight_kg}
                                                 onChange={(e) => updateContainer(idx, 'gross_weight_kg', e.target.value)}
