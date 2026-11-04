@@ -12,6 +12,7 @@ use App\Models\JobCost;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\TitipanDana;
+use App\Services\JobClose;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -64,6 +65,9 @@ class InvoiceController extends Controller
         // HARDENING 2026-11-04 (temuan #1): sama seperti create() — store
         // invoice wajib lolos akses Job.
         Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): Job tertutup tidak menerima invoice baru.
+        JobClose::assertNotClosed($job);
 
         $data = $request->validate([
             'invoice_date' => ['required', 'date'],
@@ -242,6 +246,9 @@ class InvoiceController extends Controller
     {
         Gate::authorize('invoice');
 
+        // KUNCI TUTUP (§2.3, Q11): persetujuan invoice adalah tulis.
+        JobClose::assertNotClosed($invoice->job);
+
         $fakturPajak = $request->input('faktur_pajak_number');
         $invoice->approve($request->user(), $fakturPajak);
 
@@ -254,6 +261,11 @@ class InvoiceController extends Controller
     public function storePayment(Request $request, Invoice $invoice): RedirectResponse
     {
         Gate::authorize('pembayaran_alokasi');
+
+        // KUNCI TUTUP (§2.3, Q11): pembayaran ke invoice Job tertutup ditolak
+        // — tagihan Job tertutup sudah lunas; pembayaran baru hanya akan
+        // menjadi kelebihan bayar.
+        JobClose::assertNotClosed($invoice->job);
 
         $data = $request->validate([
             'payment_date' => ['required', 'date'],
@@ -311,6 +323,9 @@ class InvoiceController extends Controller
             // yang sama menunggu di sini sampai transaksi ini selesai.
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
             $invoice = Invoice::query()->lockForUpdate()->findOrFail($data['invoice_id']);
+
+            // KUNCI TUTUP (§2.3, Q11): alokasi ke invoice Job tertutup ditolak.
+            JobClose::assertNotClosed($invoice->job);
 
             // TEMUAN #3 (2026-11-04): pembayaran hanya boleh dialokasikan ke
             // invoice milik importir yang SAMA. Sebelumnya endpoint hanya

@@ -27,7 +27,11 @@ return [
     'kurs_internal' => ['finance'],
     'invoice' => ['finance'],
     'pembayaran_alokasi' => ['finance'],
-    'reopen_close' => ['finance'],
+    // Close & reopen (§2.3, Q11): Admin/Finance. Catatan: matriks ini
+    // sebelumnya hanya mencantumkan finance untuk reopen_close — spesifikasi
+    // §2.3 dan §2.5 menyebut Admin/Finance, jadi admin ditambahkan di sini.
+    'close_job' => ['admin', 'finance'],
+    'reopen_close' => ['admin', 'finance'],
 
     // Laporan: granularitas per laporan diselesaikan di tiket 16 (§7).
     'laporan_semua' => ['admin'],
