@@ -101,4 +101,31 @@ class JobDocument extends Model
         // Hitung ulang status job setelah ada dokumen diverifikasi
         $this->job->recomputeStatus();
     }
+
+    /**
+     * Batalkan verifikasi: status kembali ke 'diupload', data verifikator
+     * dibersihkan. Alasan wajib (divalidasi di controller) dan tercatat
+     * di audit trail — riwayat verifikasi sebelumnya tetap ada di audit,
+     * tidak dihapus.
+     */
+    public function markUnverified(User $user, string $reason): void
+    {
+        $previousVerifier = $this->verified_by_user_id;
+
+        $this->update([
+            'status' => self::STATUS_DIUPLOAD,
+            'verified_by_user_id' => null,
+            'verified_at' => null,
+            'notes' => $reason,
+        ]);
+
+        Audit::record('job_document.unverified', $this, [
+            'status' => self::STATUS_DIUPLOAD,
+            'unverified_by' => $user->id,
+            'previous_verifier' => $previousVerifier,
+        ], $reason);
+
+        // Hitung ulang status job setelah verifikasi dibatalkan
+        $this->job->recomputeStatus();
+    }
 }
