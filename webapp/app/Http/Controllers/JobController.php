@@ -226,8 +226,9 @@ class JobController extends Controller
             'canAssignField' => $request->user()->can('job_assignment'),
             'canVerifyDoc' => $request->user()->can('verify_milestone'),
             // Pembatalan verifikasi: pemegang ability verifikasi (Ops) ATAU
-            // Admin/Finance — verifikator asli tetap dilarang (maker-checker,
-            // ditegakkan di unverifyDocument + disembunyikan di UI).
+            // Admin/Finance — verifikator asli BOLEH membatalkan
+            // verifikasinya sendiri (relaksasi ADR 0006 khusus unverify,
+            // keputusan user 2026-11-04; alasan wajib + audit).
             'canUnverifyDoc' => $request->user()->can('verify_milestone')
                 || $request->user()->hasAnyRole([Role::ADMIN, Role::FINANCE]),
             // Penutupan Job (§2.3, Q11): status tiap syarat close secara live.
@@ -332,10 +333,12 @@ class JobController extends Controller
 
     /**
      * Batalkan verifikasi dokumen: status kembali ke 'diupload'.
-     * Alasan wajib, tercatat di audit. Verifikator asli dilarang
-     * membatalkan verifikasinya sendiri (maker-checker, ADR 0006) —
-     * yang boleh adalah pemegang ability verifikasi lain, atau
-     * Admin/Finance. Job tertutup terkunci, sama seperti verify.
+     * Alasan wajib, tercatat di audit. RELAKSASI 2026-11-04 (keputusan
+     * user): verifikator asli BOLEH membatalkan verifikasinya sendiri —
+     * pembatalan adalah koreksi (revert), bukan persetujuan, dan alasan
+     * wajib + audit menjaga akuntabilitas. ADR 0006 maker-checker tetap
+     * berlaku untuk verifikasi (arah persetujuan); relaksasi ini HANYA
+     * untuk unverify. Job tertutup terkunci, sama seperti verify.
      */
     public function unverifyDocument(Request $request, Job $job, JobDocument $document): RedirectResponse
     {
@@ -362,14 +365,6 @@ class JobController extends Controller
         if ($document->status !== JobDocument::STATUS_DIVERIFIKASI) {
             throw ValidationException::withMessages([
                 'unverify' => 'Hanya dokumen berstatus diverifikasi yang bisa dibatalkan verifikasinya.',
-            ]);
-        }
-
-        // Maker-checker (§2.5, ADR 0006): verifikator tidak boleh membatalkan
-        // verifikasinya sendiri, walau memegang beberapa peran sekaligus.
-        if ($document->verified_by_user_id !== null && (int) $document->verified_by_user_id === (int) $user->id) {
-            throw ValidationException::withMessages([
-                'maker_checker' => 'Verifikator tidak boleh membatalkan verifikasinya sendiri (Maker-Checker, ADR 0006).',
             ]);
         }
 
