@@ -83,7 +83,10 @@ class Trip extends Model
         return $this->hasMany(SuratJalan::class);
     }
 
-    public function vendorInvoice(): BelongsToMany
+    // BUGFIX 2026-11-04: nama relasi jamak — TripController::show() dan
+    // halaman trips/show.tsx memakai 'vendorInvoices' (diserialisasi menjadi
+    // vendor_invoices); nama singular lama melempar RelationNotFoundException.
+    public function vendorInvoices(): BelongsToMany
     {
         return $this->belongsToMany(VendorInvoice::class, 'trip_vendor_invoice', 'trip_id', 'vendor_invoice_id')
             ->withTimestamps();
