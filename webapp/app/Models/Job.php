@@ -15,16 +15,27 @@ class Job extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_DRAFT = 'Draft';
+
     public const STATUS_DOKUMEN_LENGKAP = 'Dokumen Lengkap';
+
     public const STATUS_PIB_FILED = 'PIB Filed';
+
     public const STATUS_SPPB = 'SPPB';
+
     public const STATUS_GATE_OUT_SEBAGIAN = 'Gate-Out Sebagian';
+
     public const STATUS_GATE_OUT_SELESAI = 'Gate-Out Selesai';
+
     public const STATUS_TERKIRIM = 'Terkirim';
+
     public const STATUS_GATE_IN_SEBAGIAN = 'Gate-In Empty Sebagian';
+
     public const STATUS_GATE_IN_SELESAI = 'Gate-In Empty Selesai';
+
     public const STATUS_DITAGIH = 'Ditagih';
+
     public const STATUS_LUNAS = 'Lunas';
+
     public const STATUS_CLOSED = 'Closed';
 
     protected $fillable = [
@@ -96,6 +107,37 @@ class Job extends Model
     public function costs(): HasMany
     {
         return $this->hasMany(JobCost::class);
+    }
+
+    /**
+     * Biaya pihak ketiga yang boleh ditagih ke Importir (Blok B, §6.4).
+     * SATU-SATUNYA definisi billable — dipakai preview (InvoiceController::
+     * create) dan submit (store) supaya keduanya tidak bisa menyimpang
+     * (HARDENING 2026-11-04; sebelumnya preview dan submit memakai filter
+     * berbeda: preview tidak menyaring status aktual, tidak menyaring
+     * deposit-forfeit, dan tidak menyaring biaya yang sudah ditagih —
+     * karena memang belum ada penandanya).
+     *
+     *  - payer_flag != importir_langsung: biaya yang dibayar langsung oleh
+     *    Importir tidak ditagih. Ini JUGA penanda ocean freight per
+     *    spesifikasi §6.4: prepaid (dibayar langsung importir) -> tidak
+     *    ditagih, hanya dilacak untuk CIF; collect (dibayar PPJK) -> masuk
+     *    tagihan sebagai pass-through. Karena itu TIDAK ada lagi pengecualian
+     *    cost_type ocean_freight di sini — pengecualian lama membuat freight
+     *    yang dibayar PPJK hilang dari tagihan (kebocoran yang sama
+     *    keluarganya dengan Blok B yang dulu hardcoded 0).
+     *  - status aktual: estimasi bukan tagihan.
+     *  - bukan container_deposit_forfeit: deposit punya ledger sendiri
+     *    (ADR 0005), bukan item invoice.
+     *  - belum pernah ditagih (invoice_id null).
+     */
+    public function billableCosts(): HasMany
+    {
+        return $this->costs()
+            ->where('payer_flag', '!=', JobCost::PAYER_IMPORTIR)
+            ->where('cost_type', '!=', JobCost::TYPE_DEPOSIT_FORFEIT)
+            ->where('status', JobCost::STATUS_AKTUAL)
+            ->whereNull('invoice_id');
     }
 
     public function deposits(): HasMany

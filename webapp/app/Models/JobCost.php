@@ -12,19 +12,29 @@ class JobCost extends Model
     use BelongsToCompany, HasFactory;
 
     public const TYPE_OCEAN_FREIGHT = 'ocean_freight';
+
     public const TYPE_THC = 'thc';
+
     public const TYPE_DEMURRAGE = 'demurrage';
+
     public const TYPE_DETENTION = 'detention';
+
     public const TYPE_DO_FEE = 'do_fee';
+
     public const TYPE_ADMIN_TERMINAL = 'admin_terminal';
+
     public const TYPE_KARANTINA = 'karantina';
+
     public const TYPE_TRUCKING = 'trucking';
+
     public const TYPE_DEPOSIT_FORFEIT = 'container_deposit_forfeit';
 
     public const PAYER_PPJK = 'ppjk';
+
     public const PAYER_IMPORTIR = 'importir_langsung';
 
     public const STATUS_ESTIMASI = 'estimasi';
+
     public const STATUS_AKTUAL = 'aktual';
 
     protected $fillable = [
@@ -40,6 +50,11 @@ class JobCost extends Model
         'bukti_number',
         'notes',
         'created_by_user_id',
+        // HARDENING 2026-11-04: penanda sudah ditagih (lihat migrasi
+        // 2026_11_04_001300). Diisi saat invoice dibuat; dipakai
+        // Job::billableCosts() untuk mencegah double-billing.
+        'invoice_id',
+        'invoiced_at',
     ];
 
     protected function casts(): array
@@ -48,12 +63,18 @@ class JobCost extends Model
             'amount_valas' => 'decimal:4',
             'kurs_internal_rate' => 'decimal:4',
             'amount_idr' => 'decimal:4',
+            'invoiced_at' => 'datetime',
         ];
     }
 
     public function job(): BelongsTo
     {
         return $this->belongsTo(Job::class);
+    }
+
+    public function invoice(): BelongsTo
+    {
+        return $this->belongsTo(Invoice::class);
     }
 
     public function creator(): BelongsTo
