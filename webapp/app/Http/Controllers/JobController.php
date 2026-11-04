@@ -225,6 +225,11 @@ class JobController extends Controller
             'fieldUsers' => $fieldUsers,
             'canAssignField' => $request->user()->can('job_assignment'),
             'canVerifyDoc' => $request->user()->can('verify_milestone'),
+            // Pembatalan verifikasi: pemegang ability verifikasi (Ops) ATAU
+            // Admin/Finance — verifikator asli tetap dilarang (maker-checker,
+            // ditegakkan di unverifyDocument + disembunyikan di UI).
+            'canUnverifyDoc' => $request->user()->can('verify_milestone')
+                || $request->user()->hasAnyRole([Role::ADMIN, Role::FINANCE]),
             // Penutupan Job (§2.3, Q11): status tiap syarat close secara live.
             'closePreconditions' => app(JobClose::class)->preconditions($job),
             'canClose' => $request->user()->can('close_job'),
@@ -305,6 +310,72 @@ class JobController extends Controller
         }
 
         return PrivateFile::download($document->file_path, $document->file_name);
+    }
+
+    /**
+     * Pratinjau file dokumen di tab baru (inline disposition).
+     * Gate + kepemilikan SAMA PERSIS seperti downloadDocument — bedanya
+     * hanya penyajian: response() inline, bukan download() attachment.
+     * Tipe di luar daftar pratinjau (mis. docx/xlsx) ditolak 415 oleh
+     * PrivateFile::preview(); tombol "Lihat" juga disembunyikan di UI.
+     */
+    public function previewDocument(Request $request, Job $job, JobDocument $document): StreamedResponse
+    {
+        Gate::authorize('view', $job);
+
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
+
+        return PrivateFile::preview($document->file_path, $document->file_name);
+    }
+
+    /**
+     * Batalkan verifikasi dokumen: status kembali ke 'diupload'.
+     * Alasan wajib, tercatat di audit. Verifikator asli dilarang
+     * membatalkan verifikasinya sendiri (maker-checker, ADR 0006) —
+     * yang boleh adalah pemegang ability verifikasi lain, atau
+     * Admin/Finance. Job tertutup terkunci, sama seperti verify.
+     */
+    public function unverifyDocument(Request $request, Job $job, JobDocument $document): RedirectResponse
+    {
+        $user = $request->user();
+
+        if (! $user->can('verify_milestone') && ! $user->hasAnyRole([Role::ADMIN, Role::FINANCE])) {
+            abort(403, 'Hanya Ops, Admin, atau Finance yang boleh membatalkan verifikasi dokumen.');
+        }
+
+        Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): pembatalan verifikasi adalah tulis.
+        JobClose::assertNotClosed($job);
+
+        // BUGFIX: cek kepemilikan yang sama seperti upload/verify/download.
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        if ($document->status !== JobDocument::STATUS_DIVERIFIKASI) {
+            throw ValidationException::withMessages([
+                'unverify' => 'Hanya dokumen berstatus diverifikasi yang bisa dibatalkan verifikasinya.',
+            ]);
+        }
+
+        // Maker-checker (§2.5, ADR 0006): verifikator tidak boleh membatalkan
+        // verifikasinya sendiri, walau memegang beberapa peran sekaligus.
+        if ($document->verified_by_user_id !== null && (int) $document->verified_by_user_id === (int) $user->id) {
+            throw ValidationException::withMessages([
+                'maker_checker' => 'Verifikator tidak boleh membatalkan verifikasinya sendiri (Maker-Checker, ADR 0006).',
+            ]);
+        }
+
+        $document->markUnverified($user, $data['reason']);
+
+        return redirect()->back();
     }
 
     public function updateProblemFlag(Request $request, Job $job): RedirectResponse
