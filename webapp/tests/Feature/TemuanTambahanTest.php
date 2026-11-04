@@ -410,6 +410,86 @@ class TemuanTambahanTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Temuan #6 — status trip tidak boleh melompati tahapan
+    // ------------------------------------------------------------------
+
+    #[Test]
+    public function trip_tidak_bisa_lompat_assigned_ke_delivered(): void
+    {
+        $trip = Trip::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'vendor_id' => $this->vendor->id,
+            'status' => Trip::STATUS_ASSIGNED,
+        ]);
+
+        $response = $this->actingAs($this->ops)->patch(route('trips.status', $trip->id), [
+            'status' => Trip::STATUS_DELIVERED,
+            'actual_arrival' => '2026-11-05 10:00:00',
+        ]);
+
+        $response->assertSessionHasErrors(['status']);
+        $this->assertSame(Trip::STATUS_ASSIGNED, $trip->fresh()->status);
+        $this->assertNull($trip->fresh()->actual_arrival);
+    }
+
+    #[Test]
+    public function trip_rantai_legal_diterima(): void
+    {
+        $trip = Trip::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'vendor_id' => $this->vendor->id,
+            'status' => Trip::STATUS_ASSIGNED,
+        ]);
+
+        $this->actingAs($this->ops)->patch(route('trips.status', $trip->id), [
+            'status' => Trip::STATUS_CONFIRMED,
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->ops)->patch(route('trips.status', $trip->id), [
+            'status' => Trip::STATUS_IN_TRANSIT,
+        ])->assertSessionHasNoErrors();
+
+        $this->actingAs($this->ops)->patch(route('trips.status', $trip->id), [
+            'status' => Trip::STATUS_DELIVERED,
+            'actual_arrival' => '2026-11-05 10:00:00',
+        ])->assertSessionHasNoErrors();
+
+        $trip->refresh();
+        $this->assertSame(Trip::STATUS_DELIVERED, $trip->status);
+        $this->assertNotNull($trip->actual_arrival);
+    }
+
+    #[Test]
+    public function trip_cancelled_ditolak_dari_in_transit_dan_delivered_bersifat_final(): void
+    {
+        $inTransit = Trip::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'vendor_id' => $this->vendor->id,
+            'status' => Trip::STATUS_IN_TRANSIT,
+        ]);
+
+        $this->actingAs($this->ops)->patch(route('trips.status', $inTransit->id), [
+            'status' => Trip::STATUS_CANCELLED,
+        ])->assertSessionHasErrors(['status']);
+        $this->assertSame(Trip::STATUS_IN_TRANSIT, $inTransit->fresh()->status);
+
+        $delivered = Trip::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'vendor_id' => $this->vendor->id,
+            'status' => Trip::STATUS_DELIVERED,
+        ]);
+
+        $this->actingAs($this->ops)->patch(route('trips.status', $delivered->id), [
+            'status' => Trip::STATUS_CONFIRMED,
+        ])->assertSessionHasErrors(['status']);
+        $this->assertSame(Trip::STATUS_DELIVERED, $delivered->fresh()->status);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

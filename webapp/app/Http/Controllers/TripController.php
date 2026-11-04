@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -142,6 +143,17 @@ class TripController extends Controller
         ]);
 
         $oldStatus = $trip->status;
+
+        // TEMUAN #6 (2026-11-04): status tidak boleh melompati tahapan —
+        // sebelumnya assigned bisa langsung ke delivered dan mencatat
+        // actual_arrival tanpa pernah transit. Rantai yang diizinkan ada di
+        // Trip::ALLOWED_TRANSITIONS.
+        if (! $trip->canTransitionTo($data['status'])) {
+            throw ValidationException::withMessages([
+                'status' => "Status trip tidak dapat berubah dari {$oldStatus} ke {$data['status']}.",
+            ]);
+        }
+
         $trip->update($data);
 
         if ($data['status'] === Trip::STATUS_DELIVERED && $oldStatus !== Trip::STATUS_DELIVERED) {
