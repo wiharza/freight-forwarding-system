@@ -156,6 +156,13 @@ class PibCalculator
             $hasApi = in_array(strtoupper($statusApi), ['API-U', 'API-P', 'API']);
             $rule = Pph22Rule::matchHs($hsCode);
 
+            // ADR 0008: aturan PPh 22 yang masih Perlu Verifikasi ikut
+            // menandai item ini — approve Snapshot wajib memblokirnya
+            // (sama seperti tarif MFN/FTA yang belum terverifikasi).
+            if ($rule && $rule->verification_status === Pph22Rule::STATUS_UNVERIFIED) {
+                $isUnverifiedWarning = true;
+            }
+
             if ($rule) {
                 if ($rule->lampiran === 'A') {
                     $pphCategory = 'lampiran_a_10';

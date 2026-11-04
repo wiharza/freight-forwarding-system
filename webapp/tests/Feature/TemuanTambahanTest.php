@@ -192,6 +192,81 @@ class TemuanTambahanTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Temuan #2 — approve PIB memblokir tarif belum terverifikasi (ADR 0008)
+    // ------------------------------------------------------------------
+
+    #[Test]
+    public function approve_ditolak_bila_tarif_mfn_belum_terverifikasi(): void
+    {
+        MfnTariff::create([
+            'company_id' => $this->company->id,
+            'hs_code' => '3926.90.99',
+            'description' => 'Barang plastik lain',
+            'bm_rate' => 0.10,
+            'effective_from' => '2022-04-01',
+            'verification_status' => MfnTariff::STATUS_UNVERIFIED,
+        ]);
+
+        $declaration = $this->buatDrafPib($this->job, '3926909900');
+
+        $this->assertTrue($declaration->items()->firstOrFail()->is_unverified_warning);
+
+        $response = $this->actingAs($this->customs2)->post(
+            route('jobs.calculator.approve', ['job' => $this->job->id, 'declaration' => $declaration->id])
+        );
+
+        $response->assertSessionHasErrors(['approval']);
+        $this->assertSame(
+            CustomsDeclaration::STATUS_DRAFT,
+            $declaration->fresh()->status
+        );
+    }
+
+    #[Test]
+    public function approve_ditolak_bila_aturan_pph22_belum_terverifikasi(): void
+    {
+        Pph22Rule::create([
+            'company_id' => $this->company->id,
+            'hs_code' => '33.04',
+            'lampiran' => 'A',
+            'rate' => 0.10,
+            'verification_status' => Pph22Rule::STATUS_UNVERIFIED,
+        ]);
+
+        $declaration = $this->buatDrafPib($this->job, '3304990000');
+
+        $this->assertTrue($declaration->items()->firstOrFail()->is_unverified_warning);
+
+        $response = $this->actingAs($this->customs2)->post(
+            route('jobs.calculator.approve', ['job' => $this->job->id, 'declaration' => $declaration->id])
+        );
+
+        $response->assertSessionHasErrors(['approval']);
+        $this->assertSame(
+            CustomsDeclaration::STATUS_DRAFT,
+            $declaration->fresh()->status
+        );
+    }
+
+    #[Test]
+    public function approve_diterima_bila_semua_tarif_terverifikasi(): void
+    {
+        $declaration = $this->buatDrafPib($this->job, '8471302000');
+
+        $this->assertFalse($declaration->items()->firstOrFail()->is_unverified_warning);
+
+        $response = $this->actingAs($this->customs2)->post(
+            route('jobs.calculator.approve', ['job' => $this->job->id, 'declaration' => $declaration->id])
+        );
+
+        $response->assertSessionHasNoErrors();
+        $this->assertSame(
+            CustomsDeclaration::STATUS_APPROVED,
+            $declaration->fresh()->status
+        );
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

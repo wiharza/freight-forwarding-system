@@ -14,6 +14,7 @@ use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -121,6 +122,26 @@ class PibCalculatorController extends Controller
         Gate::authorize('approve_snapshot');
 
         MakerChecker::assertApproverDiffers($request->user(), $declaration);
+
+        // ADR 0008 (temuan #2, 2026-11-04): Snapshot PIB TIDAK BOLEH
+        // disetujui bila ada seri barang yang memakai tarif master berstatus
+        // Perlu Verifikasi. Kalkulator hanya memberi peringatan — approve
+        // adalah gerbangnya. Flag is_unverified_warning tersimpan per item
+        // saat draf dihitung (tarif MFN/FTA + aturan PPh 22 yang belum
+        // terverifikasi ikut menandainya).
+        $unverifiedItems = $declaration->items()
+            ->where('is_unverified_warning', true)
+            ->get(['item_number', 'hs_code']);
+
+        if ($unverifiedItems->isNotEmpty()) {
+            $detail = $unverifiedItems
+                ->map(fn ($item) => "Seri {$item->item_number} (HS {$item->hs_code})")
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} memakai tarif master berstatus Perlu Verifikasi (ADR 0008). Verifikasi tarifnya terlebih dahulu.",
+            ]);
+        }
 
         $declaration->update([
             'status' => CustomsDeclaration::STATUS_APPROVED,
