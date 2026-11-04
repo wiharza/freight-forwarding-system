@@ -293,6 +293,14 @@ export default function JobsShow({
         return PREVIEWABLE_EXTENSIONS.includes(ext);
     };
 
+    // Label manusia untuk badge status (bukan kode enum mentah).
+    const DOC_STATUS_LABELS: Record<DocumentItem['status'], string> = {
+        belum_ada: 'Belum ada',
+        diupload: 'Diupload',
+        diverifikasi: 'Diverifikasi',
+        tidak_berlaku: 'Tidak berlaku',
+    };
+
     const renderDocRow = (d: DocumentItem) => (
         <tr key={d.id} className="border-b last:border-b-0">
             <td className="px-3 py-2 font-medium capitalize">{d.document_type.replace(/_/g, ' ')}</td>
@@ -308,14 +316,20 @@ export default function JobsShow({
                                 : 'destructive'
                     }
                 >
-                    {d.status}
+                    {DOC_STATUS_LABELS[d.status]}
                 </Badge>
             </td>
-            <td className="px-3 py-2 text-xs">
-                {d.file_name ? <span className="text-primary font-mono">{d.file_name}</span> : <span className="text-muted-foreground">-</span>}
+            <td className="max-w-[220px] overflow-hidden px-3 py-2 text-xs">
+                {d.file_name ? (
+                    <span className="block truncate font-mono text-primary" title={d.file_name}>
+                        {d.file_name}
+                    </span>
+                ) : (
+                    <span className="text-muted-foreground">-</span>
+                )}
             </td>
-            <td className="text-muted-foreground px-3 py-2 text-xs">{d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}</td>
-            <td className="flex items-center gap-2 px-3 py-2">
+            <td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">{d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}</td>
+            <td className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
                 {d.file_path && (
                     <>
                         <Button size="sm" variant="outline" asChild>
@@ -367,12 +381,7 @@ export default function JobsShow({
                         size="sm"
                         variant="outline"
                         onClick={() => handleUnverifyDoc(d.id)}
-                        disabled={authUser?.id === d.verifier?.id}
-                        title={
-                            authUser?.id === d.verifier?.id
-                                ? 'Verifikator tidak boleh membatalkan verifikasinya sendiri (Maker-Checker, ADR 0006)'
-                                : 'Batalkan verifikasi — status kembali ke diupload, alasan wajib dan tercatat di audit'
-                        }
+                        title="Batalkan verifikasi — status kembali ke diupload, alasan wajib dan tercatat di audit"
                     >
                         <Undo2 className="mr-1 size-3" /> Batalkan Verifikasi
                     </Button>
