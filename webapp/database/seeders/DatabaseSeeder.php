@@ -48,6 +48,20 @@ class DatabaseSeeder extends Seeder
 
         $admin->roles()->sync([$roles[Role::ADMIN]->id]);
 
+        // Budi (CS) — dipakai smoke test E2E Playwright (tests/e2e/smoke.spec.cjs
+        // login sebagai budi@example.local). Seeder awalnya hanya membuat admin,
+        // sehingga test gagal di langkah login.
+        $budi = User::query()->firstOrCreate(
+            ['email' => 'budi@example.local'],
+            [
+                'company_id' => $company->id,
+                'name' => 'Budi',
+                'password' => Hash::make('password'),
+            ],
+        );
+
+        $budi->roles()->sync([$roles[Role::CS]->id]);
+
         $this->call(MasterDataSeeder::class);
         $this->call(LegalTariffSeeder::class);
     }

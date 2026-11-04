@@ -5,8 +5,10 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\ContainerType;
 use App\Models\Currency;
+use App\Models\Importir;
 use App\Models\Location;
 use App\Models\ShippingLine;
+use App\Models\Vessel;
 use App\Support\CompanyContext;
 use Illuminate\Database\Seeder;
 
@@ -78,5 +80,38 @@ class MasterDataSeeder extends Seeder
                 $line
             );
         }
+
+        // 5. Importir demo — dibutuhkan smoke test E2E (jobs/create mengambil
+        // importirs[0] sebagai default; tabel kosong membuat validasi native
+        // browser memblokir submit sebelum request terkirim). NPWP 15 digit
+        // format lama (DQ-20); nilai ini data demo, bukan NPWP asli.
+        Importir::query()->firstOrCreate(
+            ['company_id' => $companyId, 'npwp' => '01.234.567.8-901.234'],
+            [
+                'name' => 'PT Sinar Niaga Mandiri',
+                'nib' => '0123456789012',
+                'status_api' => 'API-U',
+                'address' => 'Jl. Demo No. 1, Jakarta',
+                'phone' => '021-0000000',
+                'email' => 'demo@sinarniaga.example',
+                'pic_name' => 'Budi',
+            ]
+        );
+
+        // 6. Kapal demo — SITC SHANGHAI, IMO 9074729 (check digit valid).
+        // Smoke test E2E memilih index 1 di combobox Kapal (index 0 = opsi
+        // "ketik manual"), jadi minimal 1 kapal harus ada di master.
+        $sitc = ShippingLine::query()
+            ->where('company_id', $companyId)
+            ->where('code', 'SITC')
+            ->first();
+
+        Vessel::query()->firstOrCreate(
+            ['company_id' => $companyId, 'name' => 'SITC SHANGHAI'],
+            [
+                'imo_number' => '9074729',
+                'shipping_line_id' => $sitc?->id,
+            ]
+        );
     }
 }
