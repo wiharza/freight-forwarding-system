@@ -44,4 +44,9 @@ class AuditTrail extends Model
             throw new LogicException('Audit trail tidak dapat dihapus (arsip deactivate-only, §1.5).');
         });
     }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

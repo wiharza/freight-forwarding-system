@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Finance\InternalExchangeRateController;
 use App\Http\Controllers\Finance\InvoiceController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FtaGateController;
 use App\Http\Controllers\JobCloseController;
 use App\Http\Controllers\JobController;
@@ -24,9 +25,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Kotak masuk notifikasi (§2.6, Q8, Tiket 15)
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
