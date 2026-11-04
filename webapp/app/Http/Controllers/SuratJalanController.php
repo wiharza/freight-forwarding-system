@@ -2,21 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Container;
-use App\Models\Job;
 use App\Models\SuratJalan;
 use App\Models\Trip;
-use App\Models\VendorInvoice;
 use App\Support\Audit;
+use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SuratJalanController extends Controller
 {
-    public function create(Trip $trip): \Inertia\Response
+    public function create(Trip $trip): Response
     {
         Gate::authorize('view', $trip);
 
@@ -27,7 +26,7 @@ class SuratJalanController extends Controller
         ]);
     }
 
-    public function store(Request $request, Trip $trip): \Illuminate\Http\RedirectResponse
+    public function store(Request $request, Trip $trip): RedirectResponse
     {
         Gate::authorize('view', $trip);
 
@@ -65,8 +64,12 @@ class SuratJalanController extends Controller
         return redirect()->route('surat-jalan.show', $sj->id);
     }
 
-    public function show(SuratJalan $sj): \Inertia\Response
+    public function show(SuratJalan $sj): Response
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate (konsisten dengan
+        // create/store di controller ini yang sudah memakai view Trip).
+        Gate::authorize('view', $sj->trip);
+
         $sj->load(['trip.job.importir', 'trip.vendor', 'trip.containers', 'trip.origin', 'trip.destination']);
 
         return Inertia::render('surat-jalan/show', [
@@ -74,26 +77,34 @@ class SuratJalanController extends Controller
         ]);
     }
 
-    public function sign(Request $request, \App\Models\SuratJalan $sj): \Illuminate\Http\RedirectResponse
+    public function sign(Request $request, SuratJalan $sj): RedirectResponse
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate.
+        Gate::authorize('view', $sj->trip);
+
         $sj->update([
-            'status' => \App\Models\SuratJalan::STATUS_SIGNED,
+            'status' => SuratJalan::STATUS_SIGNED,
             'signed_by_user_id' => $request->user()->id,
             'pod_signed_at' => now(),
         ]);
 
-        \App\Support\Audit::record('surat_jalan.signed', $sj, [], 'Surat Jalan ditandatangani sebagai POD');
+        Audit::record('surat_jalan.signed', $sj, [], 'Surat Jalan ditandatangani sebagai POD');
 
         return redirect()->back();
     }
 
-    public function uploadPod(Request $request, \App\Models\SuratJalan $sj): \Illuminate\Http\RedirectResponse
+    public function uploadPod(Request $request, SuratJalan $sj): RedirectResponse
     {
+        // HARDENING 2026-11-04: sebelumnya tanpa Gate.
+        Gate::authorize('view', $sj->trip);
+
         $request->validate([
             'file' => ['required', 'file', 'max:20480'], // max 20MB
         ]);
 
-        $path = $request->file('file')->store("pods/{$sj->company_id}", 'public');
+        // Disk privat 'local' (sebelumnya 'public' + link /storage/ langsung
+        // di surat-jalan/show.tsx).
+        $path = $request->file('file')->store("pods/{$sj->company_id}", 'local');
 
         $sj->update([
             'pod_file_path' => $path,
@@ -104,5 +115,15 @@ class SuratJalanController extends Controller
         Audit::record('surat_jalan.pod_uploaded', $sj, ['file_name' => $request->file('file')->getClientOriginalName()]);
 
         return redirect()->back();
+    }
+
+    /**
+     * Unduh file POD lewat endpoint ber-Gate (HARDENING 2026-11-04).
+     */
+    public function downloadPod(Request $request, SuratJalan $sj): StreamedResponse
+    {
+        Gate::authorize('view', $sj->trip);
+
+        return PrivateFile::download($sj->pod_file_path);
     }
 }

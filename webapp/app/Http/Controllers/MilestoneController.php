@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Job;
 use App\Models\Milestone;
 use App\Support\Audit;
+use App\Support\PrivateFile;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,6 +14,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MilestoneController extends Controller
 {
@@ -33,9 +35,12 @@ class MilestoneController extends Controller
         $data = $request->validate([
             'milestone_type' => ['required', Rule::in($types)],
             'occurred_at' => ['required', 'date'],
-            'container_id' => ['nullable', 'exists:containers,id'],
+            // HARDENING 2026-11-04 (otorisasi Job/kontainer): container HARUS
+            // milik Job ini — 'exists' saja memungkinkan kontainer Job lain
+            // dicatat di Job ini (cross-Job write).
+            'container_id' => ['nullable', Rule::exists('containers', 'id')->where('job_id', $job->id)],
             'container_ids' => ['nullable', 'array'],
-            'container_ids.*' => ['exists:containers,id'],
+            'container_ids.*' => [Rule::exists('containers', 'id')->where('job_id', $job->id)],
             'proof_number' => ['nullable', 'string', 'max:100'],
             'proof_file' => ['nullable', 'file', 'max:20480'],
             'notes' => ['nullable', 'string'],
@@ -56,10 +61,11 @@ class MilestoneController extends Controller
             ? Milestone::BRANCH_PABEAN
             : Milestone::BRANCH_LOGISTIK;
 
-        // Upload bukti jika ada
+        // Upload bukti jika ada — disk privat 'local' (HARDENING 2026-11-04,
+        // sebelumnya 'public' dengan path yang bisa ditebak).
         $filePath = null;
         if ($request->hasFile('proof_file')) {
-            $filePath = $request->file('proof_file')->store("proofs/{$job->company_id}/{$job->id}", 'public');
+            $filePath = $request->file('proof_file')->store("proofs/{$job->company_id}/{$job->id}", 'local');
         }
 
         // Daftar target kontainer (single vs batch). BUGFIX 2026-11-04:
@@ -110,6 +116,7 @@ class MilestoneController extends Controller
     public function verify(Request $request, Milestone $milestone): RedirectResponse
     {
         Gate::authorize('verify_milestone');
+        Gate::authorize('view', $milestone->job);
 
         $milestone->verify($request->user(), $request->input('notes'));
 
@@ -119,6 +126,7 @@ class MilestoneController extends Controller
     public function supersede(Request $request, Milestone $milestone): RedirectResponse
     {
         Gate::authorize('verify_milestone');
+        Gate::authorize('view', $milestone->job);
 
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:5'],
@@ -139,6 +147,20 @@ class MilestoneController extends Controller
         ], $request->user(), $data['reason']);
 
         return redirect()->back();
+    }
+
+    /**
+     * Unduh file bukti milestone lewat endpoint ber-Gate (HARDENING 2026-11-04).
+     */
+    public function downloadProof(Request $request, Job $job, Milestone $milestone): StreamedResponse
+    {
+        Gate::authorize('view', $job);
+
+        if ((int) $milestone->job_id !== (int) $job->id) {
+            abort(404, 'Milestone tidak ditemukan pada Job ini.');
+        }
+
+        return PrivateFile::download($milestone->proof_file_path);
     }
 
     /**

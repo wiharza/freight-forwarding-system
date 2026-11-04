@@ -33,7 +33,12 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // HARDENING 2026-11-04: 'serve' dimatikan — file di disk ini
+            // HANYA disajikan lewat endpoint download ber-Gate (lihat
+            // App\Support\PrivateFile). Dengan serve=true, Laravel melayani
+            // file disk ini lewat signed URL TANPA pemeriksaan auth, sehingga
+            // siapa pun yang memegang URL bisa mengunduh dokumen Job.
+            'serve' => false,
             'throw' => false,
         ],
 
