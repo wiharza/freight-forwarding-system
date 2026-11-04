@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Container;
 use App\Models\FreeTimeAlert;
 use App\Models\Job;
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\QueryException;
@@ -50,7 +51,7 @@ class FreeTimeAlertService
             // men-set context, sehingga scope jatuh ke company pertama (min id) dan
             // alarm diam-diam tidak pernah berbunyi untuk tenant lain. Set context
             // eksplisit per company untuk setiap iterasi.
-            app(\App\Support\CompanyContext::class)->set($company->id);
+            app(CompanyContext::class)->set($company->id);
 
             $jobs = Job::query()
                 ->where('company_id', $company->id)

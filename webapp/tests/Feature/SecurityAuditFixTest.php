@@ -3,17 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Company;
-use App\Models\Container;
 use App\Models\CustomsDeclaration;
 use App\Models\FreeTimeAlert;
+use App\Models\FtaForm;
 use App\Models\Importir;
 use App\Models\InternalExchangeRate;
 use App\Models\Job;
 use App\Models\Milestone;
+use App\Models\NotificationLog;
 use App\Models\ShippingLine;
 use App\Models\User;
 use App\Services\FreeTimeAlertService;
-use App\Services\JobClose;
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -53,7 +54,7 @@ class SecurityAuditFixTest extends TestCase
      */
     private function makeTenantFixture(Company $company): Job
     {
-        app(\App\Support\CompanyContext::class)->set($company->id);
+        app(CompanyContext::class)->set($company->id);
 
         InternalExchangeRate::factory()->create([
             'company_id' => $company->id,
@@ -124,7 +125,7 @@ class SecurityAuditFixTest extends TestCase
         $jobB = $this->makeTenantFixture($companyB);
 
         // Pastikan context tidak beruntung: set ke company yang BUKAN keduanya.
-        app(\App\Support\CompanyContext::class)->set(999999);
+        app(CompanyContext::class)->set(999999);
 
         $summary = app(FreeTimeAlertService::class)->checkAll($this->asOf);
 
@@ -146,7 +147,7 @@ class SecurityAuditFixTest extends TestCase
         // Konteks di-reset per tenant — tidak ada kebocoran company_id pada log
         $this->assertSame(
             [$companyA->id, $companyB->id],
-            \App\Models\NotificationLog::query()->withoutGlobalScopes()->orderBy('company_id')->pluck('company_id')->unique()->values()->all()
+            NotificationLog::query()->withoutGlobalScopes()->orderBy('company_id')->pluck('company_id')->unique()->values()->all()
         );
     }
 
@@ -159,7 +160,7 @@ class SecurityAuditFixTest extends TestCase
         $this->makeTenantFixture($companyA);
         $this->makeTenantFixture($companyB);
 
-        app(\App\Support\CompanyContext::class)->set(999999);
+        app(CompanyContext::class)->set(999999);
 
         $this->artisan('app:recalculate-demurrage')->assertExitCode(0);
 
@@ -176,7 +177,7 @@ class SecurityAuditFixTest extends TestCase
     public function approve_deklarasi_milik_job_lain_ditolak_404(): void
     {
         $company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($company->id);
+        app(CompanyContext::class)->set($company->id);
 
         $line = ShippingLine::factory()->create(['company_id' => $company->id]);
         $importir = Importir::factory()->create(['company_id' => $company->id]);
@@ -236,7 +237,7 @@ class SecurityAuditFixTest extends TestCase
     public function store_form_fta_pada_job_tertutup_ditolak(): void
     {
         $company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($company->id);
+        app(CompanyContext::class)->set($company->id);
 
         $line = ShippingLine::factory()->create(['company_id' => $company->id]);
         $importir = Importir::factory()->create(['company_id' => $company->id]);
@@ -264,6 +265,6 @@ class SecurityAuditFixTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors(['job_closed']);
-        $this->assertSame(0, \App\Models\FtaForm::query()->where('job_id', $job->id)->count());
+        $this->assertSame(0, FtaForm::query()->where('job_id', $job->id)->count());
     }
 }
