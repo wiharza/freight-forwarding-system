@@ -1,8 +1,8 @@
+import { MasterTabs } from '@/components/master-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MasterTabs } from '@/components/master-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -44,8 +44,8 @@ export default function MasterVendors({ items }: { items: Item[] }) {
                 <h2 className="text-lg font-medium">Master Vendor Trucking (§5.1)</h2>
 
                 <div className="grid gap-6 md:grid-cols-3">
-                    <div className="md:col-span-1 rounded-xl border p-4">
-                        <h3 className="font-medium mb-3">Tambah Vendor</h3>
+                    <div className="rounded-xl border p-4 md:col-span-1">
+                        <h3 className="mb-3 font-medium">Tambah Vendor</h3>
                         <form onSubmit={submit} className="space-y-3">
                             <div>
                                 <Label htmlFor="name">Nama Vendor</Label>
@@ -56,7 +56,7 @@ export default function MasterVendors({ items }: { items: Item[] }) {
                                 <Label htmlFor="vendor_type">Tipe Vendor</Label>
                                 <select
                                     id="vendor_type"
-                                    className="w-full border rounded-md p-2 text-sm bg-background"
+                                    className="bg-background w-full rounded-md border p-2 text-sm"
                                     value={data.vendor_type}
                                     onChange={(e) => setData('vendor_type', e.target.value)}
                                 >
@@ -78,10 +78,10 @@ export default function MasterVendors({ items }: { items: Item[] }) {
                         </form>
                     </div>
 
-                    <div className="md:col-span-2 overflow-x-auto rounded-xl border">
+                    <div className="overflow-x-auto rounded-xl border md:col-span-2">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
+                                <tr className="bg-muted/50 border-b text-left">
                                     <th className="px-3 py-2">Nama</th>
                                     <th className="px-3 py-2">Tipe</th>
                                     <th className="px-3 py-2">PIC</th>
@@ -93,9 +93,7 @@ export default function MasterVendors({ items }: { items: Item[] }) {
                                     <tr key={item.id} className="border-b last:border-b-0">
                                         <td className="px-3 py-2 font-medium">{item.name}</td>
                                         <td className="px-3 py-2">
-                                            <Badge variant={item.vendor_type === 'internal' ? 'default' : 'secondary'}>
-                                                {item.vendor_type}
-                                            </Badge>
+                                            <Badge variant={item.vendor_type === 'internal' ? 'default' : 'secondary'}>{item.vendor_type}</Badge>
                                         </td>
                                         <td className="px-3 py-2">{item.contact_person || '-'}</td>
                                         <td className="px-3 py-2">{item.phone || '-'}</td>

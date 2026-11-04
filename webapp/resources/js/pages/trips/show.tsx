@@ -37,11 +37,11 @@ export default function TripsShow({ trip }: { trip: TripDetail }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={trip.trip_number} />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-5xl">
+            <div className="flex h-full max-w-5xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                        <h2 className="text-lg font-medium font-mono">{trip.trip_number}</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <h2 className="font-mono text-lg font-medium">{trip.trip_number}</h2>
+                        <p className="text-muted-foreground mt-1 text-xs">
                             Job {trip.job?.job_number ?? '-'} · Vendor {trip.vendor?.name ?? '-'} · {trip.scheduled_date}
                         </p>
                     </div>
@@ -49,25 +49,31 @@ export default function TripsShow({ trip }: { trip: TripDetail }) {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                    <div className="rounded-xl border p-4 space-y-2 bg-card text-sm">
-                        <h3 className="font-medium text-sm border-b pb-1">Rute & Pengemudi</h3>
+                    <div className="bg-card space-y-2 rounded-xl border p-4 text-sm">
+                        <h3 className="border-b pb-1 text-sm font-medium">Rute & Pengemudi</h3>
                         <p>Asal: {trip.origin?.name ?? '-'}</p>
                         <p>Tujuan: {trip.destination?.name ?? '-'}</p>
-                        <p>Pengemudi: {trip.driver_name ?? '-'} {trip.driver_phone ? `(${trip.driver_phone})` : ''}</p>
-                        <p>Kendaraan: <span className="font-mono">{trip.vehicle_number ?? '-'}</span></p>
+                        <p>
+                            Pengemudi: {trip.driver_name ?? '-'} {trip.driver_phone ? `(${trip.driver_phone})` : ''}
+                        </p>
+                        <p>
+                            Kendaraan: <span className="font-mono">{trip.vehicle_number ?? '-'}</span>
+                        </p>
                         <p>Kedatangan aktual: {trip.actual_arrival ?? '-'}</p>
                     </div>
-                    <div className="rounded-xl border p-4 space-y-2 bg-card text-sm">
-                        <h3 className="font-medium text-sm border-b pb-1">Kontainer</h3>
-                        <ul className="list-disc list-inside font-mono text-xs">
+                    <div className="bg-card space-y-2 rounded-xl border p-4 text-sm">
+                        <h3 className="border-b pb-1 text-sm font-medium">Kontainer</h3>
+                        <ul className="list-inside list-disc font-mono text-xs">
                             {trip.containers.map((c) => (
-                                <li key={c.id}>{c.container_number} — {c.size}' {c.type}</li>
+                                <li key={c.id}>
+                                    {c.container_number} — {c.size}' {c.type}
+                                </li>
                             ))}
                         </ul>
-                        <h3 className="font-medium text-sm border-b pb-1 mt-3">Surat Jalan</h3>
+                        <h3 className="mt-3 border-b pb-1 text-sm font-medium">Surat Jalan</h3>
                         {trip.surat_jalan ? (
                             <p>
-                                <Link href={route('surat-jalan.show', trip.surat_jalan.id)} className="underline font-mono">
+                                <Link href={route('surat-jalan.show', trip.surat_jalan.id)} className="font-mono underline">
                                     {trip.surat_jalan.sj_number}
                                 </Link>{' '}
                                 <Badge variant="outline">{trip.surat_jalan.status}</Badge>
@@ -78,19 +84,21 @@ export default function TripsShow({ trip }: { trip: TripDetail }) {
                     </div>
                 </div>
 
-                <div className="rounded-xl border p-4 space-y-3 bg-card">
-                    <h3 className="font-medium text-sm">Status Trip</h3>
+                <div className="bg-card space-y-3 rounded-xl border p-4">
+                    <h3 className="text-sm font-medium">Status Trip</h3>
                     <div className="flex flex-wrap items-end gap-3">
                         <div>
                             <Label htmlFor="status">Ubah Status</Label>
                             <select
                                 id="status"
-                                className="border rounded-md p-2 text-sm bg-background mt-1"
+                                className="bg-background mt-1 rounded-md border p-2 text-sm"
                                 value={statusForm.data.status}
                                 onChange={(e) => statusForm.setData('status', e.target.value)}
                             >
                                 {STATUSES.map((s) => (
-                                    <option key={s} value={s}>{s}</option>
+                                    <option key={s} value={s}>
+                                        {s}
+                                    </option>
                                 ))}
                             </select>
                         </div>
@@ -115,7 +123,7 @@ export default function TripsShow({ trip }: { trip: TripDetail }) {
                     <div className="overflow-x-auto rounded-xl border">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
+                                <tr className="bg-muted/50 border-b text-left">
                                     <th className="px-3 py-2">Invoice Vendor</th>
                                     <th className="px-3 py-2 text-right">Jumlah</th>
                                 </tr>

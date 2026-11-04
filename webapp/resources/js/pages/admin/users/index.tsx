@@ -7,9 +7,7 @@ import { Head, Link } from '@inertiajs/react';
 type RoleRow = { id: number; name: string };
 type UserRow = { id: number; name: string; email: string; roles: RoleRow[] };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Manajemen User', href: '/admin/users' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Manajemen User', href: '/admin/users' }];
 
 export default function UsersIndex({ users }: { users: UserRow[] }) {
     return (
@@ -26,7 +24,7 @@ export default function UsersIndex({ users }: { users: UserRow[] }) {
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-4 py-3 font-medium">Nama</th>
                                 <th className="px-4 py-3 font-medium">Email</th>
                                 <th className="px-4 py-3 font-medium">Peran</th>

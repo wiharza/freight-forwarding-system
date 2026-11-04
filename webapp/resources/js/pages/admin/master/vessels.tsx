@@ -1,7 +1,7 @@
+import { MasterTabs } from '@/components/master-tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MasterTabs } from '@/components/master-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -43,15 +43,15 @@ export default function MasterVessels({ items, shippingLines }: { items: Item[];
                 <MasterTabs />
                 <div>
                     <h2 className="text-lg font-medium">Master Kapal</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Kapal dipilih dari daftar ini saat entri Job agar tidak ada salah ketik nama kapal / nomor IMO
-                        (check digit IMO divalidasi otomatis).
+                    <p className="text-muted-foreground mt-1 text-xs">
+                        Kapal dipilih dari daftar ini saat entri Job agar tidak ada salah ketik nama kapal / nomor IMO (check digit IMO divalidasi
+                        otomatis).
                     </p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-3">
-                    <div className="md:col-span-1 rounded-xl border p-4">
-                        <h3 className="font-medium mb-3">Tambah Kapal</h3>
+                    <div className="rounded-xl border p-4 md:col-span-1">
+                        <h3 className="mb-3 font-medium">Tambah Kapal</h3>
                         <form onSubmit={submit} className="space-y-3">
                             <div>
                                 <Label htmlFor="name">Nama Kapal</Label>
@@ -77,13 +77,15 @@ export default function MasterVessels({ items, shippingLines }: { items: Item[];
                                 <Label htmlFor="shipping_line_id">Pemilik / Operator (opsional)</Label>
                                 <select
                                     id="shipping_line_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.shipping_line_id}
                                     onChange={(e) => setData('shipping_line_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                 >
                                     <option value="">— Tidak terikat line —</option>
                                     {shippingLines.map((l) => (
-                                        <option key={l.id} value={l.id}>{l.name}</option>
+                                        <option key={l.id} value={l.id}>
+                                            {l.name}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -93,10 +95,10 @@ export default function MasterVessels({ items, shippingLines }: { items: Item[];
                         </form>
                     </div>
 
-                    <div className="md:col-span-2 overflow-x-auto rounded-xl border">
+                    <div className="overflow-x-auto rounded-xl border md:col-span-2">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
+                                <tr className="bg-muted/50 border-b text-left">
                                     <th className="px-3 py-2">Nama Kapal</th>
                                     <th className="px-3 py-2">IMO</th>
                                     <th className="px-3 py-2">Call Sign</th>
@@ -106,7 +108,7 @@ export default function MasterVessels({ items, shippingLines }: { items: Item[];
                             <tbody>
                                 {items.length === 0 && (
                                     <tr>
-                                        <td colSpan={4} className="px-3 py-4 text-center text-muted-foreground">
+                                        <td colSpan={4} className="text-muted-foreground px-3 py-4 text-center">
                                             Belum ada kapal terdaftar.
                                         </td>
                                     </tr>

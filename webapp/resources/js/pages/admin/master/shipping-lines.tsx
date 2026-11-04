@@ -1,7 +1,7 @@
+import { MasterTabs } from '@/components/master-tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MasterTabs } from '@/components/master-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -34,8 +34,8 @@ export default function MasterShippingLines({ items }: { items: Item[] }) {
                 <h2 className="text-lg font-medium">Master Shipping Line</h2>
 
                 <div className="grid gap-6 md:grid-cols-3">
-                    <div className="md:col-span-1 rounded-xl border p-4">
-                        <h3 className="font-medium mb-3">Tambah Shipping Line</h3>
+                    <div className="rounded-xl border p-4 md:col-span-1">
+                        <h3 className="mb-3 font-medium">Tambah Shipping Line</h3>
                         <form onSubmit={submit} className="space-y-3">
                             <div>
                                 <Label htmlFor="code">Kode Line (e.g. MSK, SITC)</Label>
@@ -53,10 +53,10 @@ export default function MasterShippingLines({ items }: { items: Item[] }) {
                         </form>
                     </div>
 
-                    <div className="md:col-span-2 overflow-x-auto rounded-xl border">
+                    <div className="overflow-x-auto rounded-xl border md:col-span-2">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
+                                <tr className="bg-muted/50 border-b text-left">
                                     <th className="px-3 py-2">Kode</th>
                                     <th className="px-3 py-2">Nama Pelayaran</th>
                                 </tr>

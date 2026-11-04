@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertCircle, CheckCircle2, Clock, Edit2, FileText, PlusCircle, RotateCcw, Upload, UserCheck } from 'lucide-react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { CheckCircle2, Clock, Edit2, FileText, PlusCircle, Upload, UserCheck } from 'lucide-react';
 import React, { useState } from 'react';
 
 type ContainerItem = {
@@ -127,7 +127,7 @@ export default function JobsShow({
     canAssignField: boolean;
     canVerifyDoc: boolean;
 }) {
-    const authUser = usePage().props.auth.user;
+    const authUser = usePage<SharedData>().props.auth.user;
     const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [showMilestoneModal, setShowMilestoneModal] = useState(false);
@@ -234,35 +234,25 @@ export default function JobsShow({
                         d.status === 'diverifikasi'
                             ? 'default'
                             : d.status === 'diupload'
-                            ? 'outline'
-                            : d.status === 'tidak_berlaku'
-                            ? 'secondary'
-                            : 'destructive'
+                              ? 'outline'
+                              : d.status === 'tidak_berlaku'
+                                ? 'secondary'
+                                : 'destructive'
                     }
                 >
                     {d.status}
                 </Badge>
             </td>
             <td className="px-3 py-2 text-xs">
-                {d.file_name ? (
-                    <span className="font-mono text-primary">{d.file_name}</span>
-                ) : (
-                    <span className="text-muted-foreground">-</span>
-                )}
+                {d.file_name ? <span className="text-primary font-mono">{d.file_name}</span> : <span className="text-muted-foreground">-</span>}
             </td>
-            <td className="px-3 py-2 text-xs text-muted-foreground">
-                {d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}
-            </td>
-            <td className="px-3 py-2 flex items-center gap-2">
+            <td className="text-muted-foreground px-3 py-2 text-xs">{d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}</td>
+            <td className="flex items-center gap-2 px-3 py-2">
                 {d.status !== 'diverifikasi' && d.status !== 'tidak_berlaku' && (
                     <>
                         {selectedDocId === d.id ? (
                             <div className="flex items-center gap-2">
-                                <input
-                                    type="file"
-                                    className="text-xs max-w-xs"
-                                    onChange={(e) => setDocFile(e.target.files?.[0] || null)}
-                                />
+                                <input type="file" className="max-w-xs text-xs" onChange={(e) => setDocFile(e.target.files?.[0] || null)} />
                                 <Button size="sm" onClick={() => handleUploadDoc(d.id)} disabled={!docFile}>
                                     Upload
                                 </Button>
@@ -272,13 +262,13 @@ export default function JobsShow({
                             </div>
                         ) : (
                             <Button size="sm" variant="outline" onClick={() => setSelectedDocId(d.id)}>
-                                <Upload className="size-3 mr-1" /> Unggah
+                                <Upload className="mr-1 size-3" /> Unggah
                             </Button>
                         )}
 
                         {d.status === 'diupload' && canVerifyDoc && (
                             <Button size="sm" variant="default" onClick={() => handleVerifyDoc(d.id)}>
-                                <CheckCircle2 className="size-3 mr-1" /> Verifikasi
+                                <CheckCircle2 className="mr-1 size-3" /> Verifikasi
                             </Button>
                         )}
                     </>
@@ -290,17 +280,17 @@ export default function JobsShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Job ${job.job_number}`} />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-6xl">
+            <div className="flex h-full max-w-6xl flex-1 flex-col gap-6 rounded-xl p-4">
                 {/* Header Title & Status */}
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h2 className="text-2xl font-bold font-mono">{job.job_number}</h2>
+                            <h2 className="font-mono text-2xl font-bold">{job.job_number}</h2>
                             <Badge variant={job.cached_status === 'Draft' ? 'outline' : 'default'} className="text-sm">
                                 {job.cached_status}
                             </Badge>
                             {hasDoReleased && (
-                                <Badge variant="secondary" className="text-sm bg-blue-500/10 text-blue-700 dark:text-blue-300">
+                                <Badge variant="secondary" className="bg-blue-500/10 text-sm text-blue-700 dark:text-blue-300">
                                     DO Sudah Terbit (§2.2)
                                 </Badge>
                             )}
@@ -310,28 +300,30 @@ export default function JobsShow({
                                 </Badge>
                             )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            B/L: <span className="font-mono font-medium">{job.bl_number}</span> | Importir: <span className="font-medium">{job.importir?.name}</span> | Pelayaran: <span className="font-medium">{job.shipping_line?.name}</span>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                            B/L: <span className="font-mono font-medium">{job.bl_number}</span> | Importir:{' '}
+                            <span className="font-medium">{job.importir?.name}</span> | Pelayaran:{' '}
+                            <span className="font-medium">{job.shipping_line?.name}</span>
                         </p>
                     </div>
 
                     <div className="flex items-center gap-3">
                         <Link href={route('jobs.calculator', job.id)}>
                             <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700">
-                                <FileText className="size-4 mr-1.5" /> Kalkulator PIB
+                                <FileText className="mr-1.5 size-4" /> Kalkulator PIB
                             </Button>
                         </Link>
 
                         <Button size="sm" variant="outline" onClick={() => setShowMilestoneModal(true)}>
-                            <PlusCircle className="size-4 mr-1.5" /> + Catat Milestone
+                            <PlusCircle className="mr-1.5 size-4" /> + Catat Milestone
                         </Button>
 
                         {/* Problem Flag Control */}
                         <form onSubmit={handleUpdateFlag} className="flex items-center gap-1.5">
                             <select
-                                className="border rounded-md p-1.5 text-xs bg-background"
+                                className="bg-background rounded-md border p-1.5 text-xs"
                                 value={flagForm.data.problem_flag}
-                                onChange={(e) => flagForm.setData('problem_flag', e.target.value as any)}
+                                onChange={(e) => flagForm.setData('problem_flag', e.target.value as 'Hold' | 'Dispute' | 'Dokumen Bermasalah' | '')}
                             >
                                 <option value="">Tanpa Flag</option>
                                 <option value="Hold">Hold</option>
@@ -347,19 +339,19 @@ export default function JobsShow({
 
                 {/* Live Early Warning Demurrage & Detention Monitoring Card (§4.1–§4.4, Q9) */}
                 {demurrage && (
-                    <div className="rounded-xl border p-4 bg-card shadow-sm space-y-4">
+                    <div className="bg-card space-y-4 rounded-xl border p-4 shadow-sm">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
                             <div className="flex items-center gap-2">
                                 <Clock className="size-5 text-amber-500" />
-                                <h3 className="font-semibold text-base">Pemantauan Demurrage & Detention (Live Alarm §4.4)</h3>
+                                <h3 className="text-base font-semibold">Pemantauan Demurrage & Detention (Live Alarm §4.4)</h3>
                                 <Badge variant={demurrage.is_final ? 'default' : 'secondary'} className="text-xs">
                                     {demurrage.is_final ? 'Biaya Terkunci (Final)' : 'Estimasi Berjalan (Live)'}
                                 </Badge>
                             </div>
                             <div className="text-right">
-                                <div className="text-sm font-mono font-bold text-red-600 dark:text-red-400">
+                                <div className="font-mono text-sm font-bold text-red-600 dark:text-red-400">
                                     Total Denda: USD {demurrage.total_usd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                                    <span className="text-muted-foreground ml-1.5 text-xs font-normal">
                                         (≈ Rp {demurrage.total_idr.toLocaleString('id-ID')})
                                     </span>
                                 </div>
@@ -369,14 +361,16 @@ export default function JobsShow({
                         {/* List Kontainer dengan Lampu Hijau / Kuning / Merah */}
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                             {demurrage.containers.map((c) => {
-                                const demColor = c.demurrage.lampu === 'merah' ? 'bg-red-500' : c.demurrage.lampu === 'kuning' ? 'bg-amber-500' : 'bg-emerald-500';
-                                const detColor = c.detention.lampu === 'merah' ? 'bg-red-500' : c.detention.lampu === 'kuning' ? 'bg-amber-500' : 'bg-emerald-500';
+                                const demColor =
+                                    c.demurrage.lampu === 'merah' ? 'bg-red-500' : c.demurrage.lampu === 'kuning' ? 'bg-amber-500' : 'bg-emerald-500';
+                                const detColor =
+                                    c.detention.lampu === 'merah' ? 'bg-red-500' : c.detention.lampu === 'kuning' ? 'bg-amber-500' : 'bg-emerald-500';
 
                                 return (
-                                    <div key={c.container_id} className="p-3 rounded-lg border bg-muted/20 text-xs space-y-2">
-                                        <div className="flex items-center justify-between font-mono font-bold text-sm border-b pb-1">
+                                    <div key={c.container_id} className="bg-muted/20 space-y-2 rounded-lg border p-3 text-xs">
+                                        <div className="flex items-center justify-between border-b pb-1 font-mono text-sm font-bold">
                                             <span>{c.container_number}</span>
-                                            <span className="text-xs font-normal text-muted-foreground">{c.size}'</span>
+                                            <span className="text-muted-foreground text-xs font-normal">{c.size}'</span>
                                         </div>
 
                                         {/* Status Demurrage */}
@@ -388,15 +382,19 @@ export default function JobsShow({
                                                 </div>
                                                 <span className="font-mono">
                                                     {c.demurrage.overdue_days > 0 ? (
-                                                        <span className="text-red-600 font-bold">Telat {c.demurrage.overdue_days} hr</span>
+                                                        <span className="font-bold text-red-600">Telat {c.demurrage.overdue_days} hr</span>
                                                     ) : (
-                                                        <span className="text-emerald-600 font-medium">Sisa {c.demurrage.remaining_free_days} hr</span>
+                                                        <span className="font-medium text-emerald-600">
+                                                            Sisa {c.demurrage.remaining_free_days} hr
+                                                        </span>
                                                     )}
                                                 </span>
                                             </div>
-                                            <div className="text-[11px] text-muted-foreground flex justify-between">
+                                            <div className="text-muted-foreground flex justify-between text-[11px]">
                                                 <span>Last Free: {c.demurrage.last_free_date || '-'}</span>
-                                                {c.demurrage.cost_usd > 0 && <span className="font-mono font-bold text-red-600">USD {c.demurrage.cost_usd}</span>}
+                                                {c.demurrage.cost_usd > 0 && (
+                                                    <span className="font-mono font-bold text-red-600">USD {c.demurrage.cost_usd}</span>
+                                                )}
                                             </div>
                                         </div>
 
@@ -409,15 +407,19 @@ export default function JobsShow({
                                                 </div>
                                                 <span className="font-mono">
                                                     {c.detention.overdue_days > 0 ? (
-                                                        <span className="text-red-600 font-bold">Telat {c.detention.overdue_days} hr</span>
+                                                        <span className="font-bold text-red-600">Telat {c.detention.overdue_days} hr</span>
                                                     ) : (
-                                                        <span className="text-emerald-600 font-medium">Sisa {c.detention.remaining_free_days} hr</span>
+                                                        <span className="font-medium text-emerald-600">
+                                                            Sisa {c.detention.remaining_free_days} hr
+                                                        </span>
                                                     )}
                                                 </span>
                                             </div>
-                                            <div className="text-[11px] text-muted-foreground flex justify-between">
+                                            <div className="text-muted-foreground flex justify-between text-[11px]">
                                                 <span>Last Free: {c.detention.last_free_date || '-'}</span>
-                                                {c.detention.cost_usd > 0 && <span className="font-mono font-bold text-red-600">USD {c.detention.cost_usd}</span>}
+                                                {c.detention.cost_usd > 0 && (
+                                                    <span className="font-mono font-bold text-red-600">USD {c.detention.cost_usd}</span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
@@ -429,15 +431,17 @@ export default function JobsShow({
 
                 <div className="grid gap-6 lg:grid-cols-3">
                     {/* Kolom Kiri: Detail B/L & Kontainer & Staf Field */}
-                    <div className="lg:col-span-1 space-y-6">
+                    <div className="space-y-6 lg:col-span-1">
                         {/* Detail Job Card */}
-                        <div className="rounded-xl border p-4 space-y-3 bg-card text-sm">
-                            <h3 className="font-medium border-b pb-1 text-xs uppercase text-muted-foreground">Detail Muatan</h3>
+                        <div className="bg-card space-y-3 rounded-xl border p-4 text-sm">
+                            <h3 className="text-muted-foreground border-b pb-1 text-xs font-medium uppercase">Detail Muatan</h3>
                             <div>
-                                <span className="text-muted-foreground text-xs block">Kapal & Voyage:</span>
-                                <span>{job.vessel_name || '-'} {job.voyage_number ? `(${job.voyage_number})` : ''}</span>
+                                <span className="text-muted-foreground block text-xs">Kapal & Voyage:</span>
+                                <span>
+                                    {job.vessel_name || '-'} {job.voyage_number ? `(${job.voyage_number})` : ''}
+                                </span>
                                 {job.vessel?.imo_number && (
-                                    <span className="text-muted-foreground text-xs block">
+                                    <span className="text-muted-foreground block text-xs">
                                         IMO {job.vessel.imo_number}
                                         {job.vessel.call_sign ? ` · Call Sign ${job.vessel.call_sign}` : ''}
                                     </span>
@@ -445,37 +449,41 @@ export default function JobsShow({
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <span className="text-muted-foreground text-xs block">ETA:</span>
+                                    <span className="text-muted-foreground block text-xs">ETA:</span>
                                     <span>{job.eta || '-'}</span>
                                 </div>
                                 <div>
-                                    <span className="text-muted-foreground text-xs block">ATA:</span>
+                                    <span className="text-muted-foreground block text-xs">ATA:</span>
                                     <span>{job.ata || '-'}</span>
                                 </div>
                             </div>
                             <div>
-                                <span className="text-muted-foreground text-xs block">Pelabuhan Bongkar (POD):</span>
-                                <span>{job.pod?.name} ({job.pod?.code})</span>
+                                <span className="text-muted-foreground block text-xs">Pelabuhan Bongkar (POD):</span>
+                                <span>
+                                    {job.pod?.name} ({job.pod?.code})
+                                </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground text-xs block">Klaim FTA:</span>
+                                <span className="text-muted-foreground block text-xs">Klaim FTA:</span>
                                 <span>{job.claim_fta ? `Ya (${job.fta_scheme})` : 'Tidak (MFN Normal)'}</span>
                             </div>
                         </div>
 
                         {/* Kontainer Fisik Card */}
-                        <div className="rounded-xl border p-4 space-y-3 bg-card">
-                            <h3 className="font-medium border-b pb-1 text-xs uppercase text-muted-foreground">
+                        <div className="bg-card space-y-3 rounded-xl border p-4">
+                            <h3 className="text-muted-foreground border-b pb-1 text-xs font-medium uppercase">
                                 Kontainer ({job.containers.length} Unit)
                             </h3>
                             <div className="space-y-2">
                                 {job.containers.map((c) => (
-                                    <div key={c.id} className="p-2.5 rounded-lg border bg-muted/20 text-xs space-y-1">
-                                        <div className="flex justify-between font-mono font-bold text-sm">
+                                    <div key={c.id} className="bg-muted/20 space-y-1 rounded-lg border p-2.5 text-xs">
+                                        <div className="flex justify-between font-mono text-sm font-bold">
                                             <span>{c.container_number}</span>
-                                            <span>{c.size}' {c.type}</span>
+                                            <span>
+                                                {c.size}' {c.type}
+                                            </span>
                                         </div>
-                                        <div className="flex justify-between text-muted-foreground">
+                                        <div className="text-muted-foreground flex justify-between">
                                             <span>Seal: {c.seal_number || '-'}</span>
                                             <span>{parseFloat(c.gross_weight_kg).toLocaleString()} KG</span>
                                         </div>
@@ -485,25 +493,21 @@ export default function JobsShow({
                         </div>
 
                         {/* Staf Field yang Ditugaskan */}
-                        <div className="rounded-xl border p-4 space-y-3 bg-card text-sm">
-                            <h3 className="font-medium border-b pb-1 text-xs uppercase text-muted-foreground">
-                                Petugas Lapangan (Field)
-                            </h3>
+                        <div className="bg-card space-y-3 rounded-xl border p-4 text-sm">
+                            <h3 className="text-muted-foreground border-b pb-1 text-xs font-medium uppercase">Petugas Lapangan (Field)</h3>
                             <div className="flex flex-wrap gap-1">
                                 {job.fields.map((f) => (
                                     <Badge key={f.id} variant="secondary" className="flex items-center gap-1">
                                         <UserCheck className="size-3" /> {f.name}
                                     </Badge>
                                 ))}
-                                {job.fields.length === 0 && (
-                                    <span className="text-xs text-muted-foreground">Belum ada Field ditugaskan.</span>
-                                )}
+                                {job.fields.length === 0 && <span className="text-muted-foreground text-xs">Belum ada Field ditugaskan.</span>}
                             </div>
 
                             {canAssignField && (
-                                <form onSubmit={handleAssignField} className="flex gap-2 pt-2 border-t">
+                                <form onSubmit={handleAssignField} className="flex gap-2 border-t pt-2">
                                     <select
-                                        className="border rounded-md p-1.5 text-xs bg-background flex-1"
+                                        className="bg-background flex-1 rounded-md border p-1.5 text-xs"
                                         value={assignForm.data.field_user_id}
                                         onChange={(e) => assignForm.setData('field_user_id', parseInt(e.target.value))}
                                     >
@@ -522,12 +526,12 @@ export default function JobsShow({
                     </div>
 
                     {/* Kolom Kanan: Milestone Dua Cabang & Checklist Dokumen */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="space-y-6 lg:col-span-2">
                         {/* 1. Riwayat Milestone Dua Cabang (§2.2) */}
-                        <div className="rounded-xl border p-4 space-y-3 bg-card">
+                        <div className="bg-card space-y-3 rounded-xl border p-4">
                             <div className="flex items-center justify-between border-b pb-2">
-                                <h3 className="font-medium text-sm flex items-center gap-2">
-                                    <Clock className="size-4 text-primary" />
+                                <h3 className="flex items-center gap-2 text-sm font-medium">
+                                    <Clock className="text-primary size-4" />
                                     Perjalanan Milestone Dua Cabang (Pabean & Logistik)
                                 </h3>
                             </div>
@@ -535,7 +539,7 @@ export default function JobsShow({
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs">
                                     <thead>
-                                        <tr className="border-b bg-muted/40 text-left">
+                                        <tr className="bg-muted/40 border-b text-left">
                                             <th className="px-3 py-2">Cabang</th>
                                             <th className="px-3 py-2">Milestone</th>
                                             <th className="px-3 py-2">Kontainer</th>
@@ -549,28 +553,33 @@ export default function JobsShow({
                                         {job.milestones.map((m) => {
                                             const isCreator = authUser?.id === m.creator?.id;
                                             return (
-                                                <tr key={m.id} className={`border-b last:border-b-0 ${!m.is_active ? 'opacity-40 line-through' : ''}`}>
-                                                    <td className="px-3 py-2 uppercase font-mono font-bold text-[10px]">
-                                                        {m.branch}
-                                                    </td>
+                                                <tr
+                                                    key={m.id}
+                                                    className={`border-b last:border-b-0 ${!m.is_active ? 'line-through opacity-40' : ''}`}
+                                                >
+                                                    <td className="px-3 py-2 font-mono text-[10px] font-bold uppercase">{m.branch}</td>
                                                     <td className="px-3 py-2 font-medium capitalize">
                                                         {m.milestone_type.replace(/_/g, ' ')}
                                                         {m.proof_number && ` (${m.proof_number})`}
-                                                        {m.is_backdate && <Badge variant="outline" className="ml-1 text-[9px]">Backdate</Badge>}
+                                                        {m.is_backdate && (
+                                                            <Badge variant="outline" className="ml-1 text-[9px]">
+                                                                Backdate
+                                                            </Badge>
+                                                        )}
                                                     </td>
-                                                    <td className="px-3 py-2 font-mono">
-                                                        {m.container?.container_number || 'Semua (Job)'}
-                                                    </td>
+                                                    <td className="px-3 py-2 font-mono">{m.container?.container_number || 'Semua (Job)'}</td>
                                                     <td className="px-3 py-2 font-mono">{m.occurred_at.slice(0, 16).replace('T', ' ')}</td>
-                                                    <td className="px-3 py-2 text-muted-foreground">{m.creator?.name || '-'}</td>
+                                                    <td className="text-muted-foreground px-3 py-2">{m.creator?.name || '-'}</td>
                                                     <td className="px-3 py-2">
                                                         {m.verifier ? (
-                                                            <span className="text-green-700 dark:text-green-400 font-medium">✓ {m.verifier.name}</span>
+                                                            <span className="font-medium text-green-700 dark:text-green-400">
+                                                                ✓ {m.verifier.name}
+                                                            </span>
                                                         ) : (
                                                             <span className="text-muted-foreground">Belum</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-2 flex items-center gap-1.5">
+                                                    <td className="flex items-center gap-1.5 px-3 py-2">
                                                         {m.is_active && !m.verifier && canVerifyDoc && (
                                                             <Button
                                                                 size="sm"
@@ -600,7 +609,7 @@ export default function JobsShow({
                                         })}
                                         {job.milestones.length === 0 && (
                                             <tr>
-                                                <td colSpan={7} className="text-center py-6 text-muted-foreground">
+                                                <td colSpan={7} className="text-muted-foreground py-6 text-center">
                                                     Belum ada milestone tercatat untuk Job ini.
                                                 </td>
                                             </tr>
@@ -611,13 +620,13 @@ export default function JobsShow({
                         </div>
 
                         {/* 2. Checklist Dokumen Berfase (§2.4) */}
-                        <div className="rounded-xl border p-4 space-y-4 bg-card">
-                            <h3 className="font-medium text-sm border-b pb-2">Checklist Dokumen Berfase</h3>
+                        <div className="bg-card space-y-4 rounded-xl border p-4">
+                            <h3 className="border-b pb-2 text-sm font-medium">Checklist Dokumen Berfase</h3>
 
                             {/* Fase 1: Pra-Filing */}
                             <div className="space-y-1.5">
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Fase 1: Pra-Filing (Syarat Maju PIB)</h4>
-                                <table className="w-full text-xs border rounded-lg overflow-hidden">
+                                <h4 className="text-muted-foreground text-xs font-semibold uppercase">Fase 1: Pra-Filing (Syarat Maju PIB)</h4>
+                                <table className="w-full overflow-hidden rounded-lg border text-xs">
                                     <thead>
                                         <tr className="bg-muted/40 text-left">
                                             <th className="px-3 py-1.5">Dokumen</th>
@@ -633,8 +642,8 @@ export default function JobsShow({
 
                             {/* Fase 2: Pasca-Filing */}
                             <div className="space-y-1.5">
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Fase 2: Pasca-Filing (DO & SPPB)</h4>
-                                <table className="w-full text-xs border rounded-lg overflow-hidden">
+                                <h4 className="text-muted-foreground text-xs font-semibold uppercase">Fase 2: Pasca-Filing (DO & SPPB)</h4>
+                                <table className="w-full overflow-hidden rounded-lg border text-xs">
                                     <thead>
                                         <tr className="bg-muted/40 text-left">
                                             <th className="px-3 py-1.5">Dokumen</th>
@@ -650,8 +659,8 @@ export default function JobsShow({
 
                             {/* Fase 3: Pasca-Delivery */}
                             <div className="space-y-1.5">
-                                <h4 className="text-xs font-semibold text-muted-foreground uppercase">Fase 3: Pasca-Delivery (Bukti Gate & POD)</h4>
-                                <table className="w-full text-xs border rounded-lg overflow-hidden">
+                                <h4 className="text-muted-foreground text-xs font-semibold uppercase">Fase 3: Pasca-Delivery (Bukti Gate & POD)</h4>
+                                <table className="w-full overflow-hidden rounded-lg border text-xs">
                                     <thead>
                                         <tr className="bg-muted/40 text-left">
                                             <th className="px-3 py-1.5">Dokumen</th>
@@ -670,16 +679,16 @@ export default function JobsShow({
 
                 {/* Modal Catat Milestone */}
                 {showMilestoneModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-                        <div className="bg-card rounded-xl border p-6 max-w-md w-full space-y-4 shadow-xl">
-                            <h3 className="font-bold text-base">Catat Milestone Peristiwa</h3>
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                        <div className="bg-card w-full max-w-md space-y-4 rounded-xl border p-6 shadow-xl">
+                            <h3 className="text-base font-bold">Catat Milestone Peristiwa</h3>
 
                             <form onSubmit={handleStoreMilestone} className="space-y-3 text-sm">
                                 <div>
                                     <Label htmlFor="m_type">Jenis Milestone</Label>
                                     <select
                                         id="m_type"
-                                        className="w-full border rounded-md p-2 bg-background mt-1"
+                                        className="bg-background mt-1 w-full rounded-md border p-2"
                                         value={milestoneForm.data.milestone_type}
                                         onChange={(e) => milestoneForm.setData('milestone_type', e.target.value)}
                                     >
@@ -702,7 +711,7 @@ export default function JobsShow({
                                         <Label htmlFor="m_container">Pilih Kontainer</Label>
                                         <select
                                             id="m_container"
-                                            className="w-full border rounded-md p-2 bg-background mt-1 font-mono text-xs"
+                                            className="bg-background mt-1 w-full rounded-md border p-2 font-mono text-xs"
                                             value={milestoneForm.data.container_id}
                                             onChange={(e) => milestoneForm.setData('container_id', e.target.value)}
                                             required
@@ -759,13 +768,11 @@ export default function JobsShow({
                                     />
                                 </div>
 
-                                <div className="flex justify-end gap-2 pt-2 border-t">
+                                <div className="flex justify-end gap-2 border-t pt-2">
                                     <Button type="button" variant="outline" onClick={() => setShowMilestoneModal(false)}>
                                         Batal
                                     </Button>
-                                    <Button type="submit">
-                                        Simpan Milestone
-                                    </Button>
+                                    <Button type="submit">Simpan Milestone</Button>
                                 </div>
                             </form>
                         </div>

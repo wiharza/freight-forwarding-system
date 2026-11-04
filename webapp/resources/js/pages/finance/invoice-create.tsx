@@ -49,30 +49,28 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Buat Invoice" />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-5xl">
+            <div className="flex h-full max-w-5xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Buat Invoice — Job {job.job_number}</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Importir: {job.importir?.name ?? '-'} · Blok (a) diambil otomatis dari Snapshot PIB ter-approve (ADR 0004).
                     </p>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
                     {/* Blok (a) — diambil otomatis server dari snapshot */}
-                    <div className="rounded-xl border p-4 space-y-2 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Blok (a) — Pungutan Negara (otomatis dari Snapshot PIB)</h3>
-                        <p className="text-xs text-muted-foreground">
-                            Tidak bisa diedit di sini — sumbernya Snapshot SPT PIB, bukan Kalkulator (ADR 0004). Jika masih 0,
-                            pastikan draf PIB sudah di-approve di halaman Kalkulator.
+                    <div className="bg-card space-y-2 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Blok (a) — Pungutan Negara (otomatis dari Snapshot PIB)</h3>
+                        <p className="text-muted-foreground text-xs">
+                            Tidak bisa diedit di sini — sumbernya Snapshot SPT PIB, bukan Kalkulator (ADR 0004). Jika masih 0, pastikan draf PIB sudah
+                            di-approve di halaman Kalkulator.
                         </p>
                     </div>
 
                     {/* Blok (b) — biaya pihak ketiga */}
-                    <div className="rounded-xl border p-4 space-y-2 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Blok (b) — Biaya Pihak Ketiga (pass-through)</h3>
-                        {billableCosts.length === 0 && (
-                            <p className="text-xs text-muted-foreground">Belum ada biaya aktual yang dapat ditagihkan.</p>
-                        )}
+                    <div className="bg-card space-y-2 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Blok (b) — Biaya Pihak Ketiga (pass-through)</h3>
+                        {billableCosts.length === 0 && <p className="text-muted-foreground text-xs">Belum ada biaya aktual yang dapat ditagihkan.</p>}
                         <table className="w-full text-sm">
                             <tbody>
                                 {billableCosts.map((c) => (
@@ -89,8 +87,8 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
                     </div>
 
                     {/* Blok (c) — jasa PPJK */}
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Blok (c) — Jasa PPJK + PPN</h3>
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Blok (c) — Jasa PPJK + PPN</h3>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="blok_c_service_fee">Service Fee (Rp)</Label>
@@ -119,18 +117,24 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
                                 />
                             </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-muted-foreground text-xs">
                             DPP = 11/12 × {rupiah(serviceFee)} = {rupiah(dppLain)} → PPN ≈ {rupiah(ppnJasa)}
                         </p>
                     </div>
 
                     {/* Header invoice */}
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Header Invoice</h3>
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Header Invoice</h3>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="invoice_date">Tanggal Invoice</Label>
-                                <Input id="invoice_date" type="date" value={data.invoice_date} onChange={(e) => setData('invoice_date', e.target.value)} required />
+                                <Input
+                                    id="invoice_date"
+                                    type="date"
+                                    value={data.invoice_date}
+                                    onChange={(e) => setData('invoice_date', e.target.value)}
+                                    required
+                                />
                             </div>
                             <div>
                                 <Label htmlFor="due_date">Jatuh Tempo (opsional — default sesuai termin)</Label>
@@ -139,7 +143,11 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
                             </div>
                             <div>
                                 <Label htmlFor="faktur_pajak_number">Nomor Faktur Pajak (opsional saat draf)</Label>
-                                <Input id="faktur_pajak_number" value={data.faktur_pajak_number} onChange={(e) => setData('faktur_pajak_number', e.target.value)} />
+                                <Input
+                                    id="faktur_pajak_number"
+                                    value={data.faktur_pajak_number}
+                                    onChange={(e) => setData('faktur_pajak_number', e.target.value)}
+                                />
                             </div>
                             <div>
                                 <Label htmlFor="notes">Catatan</Label>

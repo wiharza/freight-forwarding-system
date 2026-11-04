@@ -43,35 +43,43 @@ export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={sj.sj_number} />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-4xl">
+            <div className="flex h-full max-w-4xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="text-lg font-medium font-mono">{sj.sj_number}</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <h2 className="font-mono text-lg font-medium">{sj.sj_number}</h2>
+                        <p className="text-muted-foreground mt-1 text-xs">
                             Trip {sj.trip?.trip_number ?? '-'} · {sj.sj_date}
                         </p>
                     </div>
                     <Badge variant={sj.status === 'signed' ? 'default' : 'outline'}>{sj.status}</Badge>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 text-sm">
-                    <div className="rounded-xl border p-4 space-y-2 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-1">Pengemudi & Kendaraan</h3>
-                        <p>{sj.driver_name} ({sj.driver_phone})</p>
+                <div className="grid gap-4 text-sm md:grid-cols-2">
+                    <div className="bg-card space-y-2 rounded-xl border p-4">
+                        <h3 className="border-b pb-1 text-sm font-medium">Pengemudi & Kendaraan</h3>
+                        <p>
+                            {sj.driver_name} ({sj.driver_phone})
+                        </p>
                         <p className="font-mono">{sj.vehicle_number}</p>
-                        <p className="text-muted-foreground text-xs pt-2">Ditandatangani POD: {sj.pod_signed_at ?? '-'}</p>
+                        <p className="text-muted-foreground pt-2 text-xs">Ditandatangani POD: {sj.pod_signed_at ?? '-'}</p>
                     </div>
-                    <div className="rounded-xl border p-4 space-y-2 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-1">Rute</h3>
-                        <p><span className="text-muted-foreground text-xs block">Asal</span>{sj.origin_address}</p>
-                        <p><span className="text-muted-foreground text-xs block">Tujuan</span>{sj.destination_address}</p>
+                    <div className="bg-card space-y-2 rounded-xl border p-4">
+                        <h3 className="border-b pb-1 text-sm font-medium">Rute</h3>
+                        <p>
+                            <span className="text-muted-foreground block text-xs">Asal</span>
+                            {sj.origin_address}
+                        </p>
+                        <p>
+                            <span className="text-muted-foreground block text-xs">Tujuan</span>
+                            {sj.destination_address}
+                        </p>
                     </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-3 py-2">Kontainer</th>
                                 <th className="px-3 py-2">Seal</th>
                                 <th className="px-3 py-2 text-right">Berat (KG)</th>
@@ -90,11 +98,7 @@ export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                    {sj.status === 'draft' && (
-                        <Button onClick={() => router.post(route('surat-jalan.sign', sj.id))}>
-                            Tandatangani (jadi POD)
-                        </Button>
-                    )}
+                    {sj.status === 'draft' && <Button onClick={() => router.post(route('surat-jalan.sign', sj.id))}>Tandatangani (jadi POD)</Button>}
                     {sj.pod_file_path && (
                         <a href={`/storage/${sj.pod_file_path}`} target="_blank" rel="noopener noreferrer">
                             <Button variant="outline">Lihat File POD</Button>
@@ -102,13 +106,9 @@ export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
                     )}
                 </div>
 
-                <form onSubmit={submitPod} className="rounded-xl border p-4 space-y-3 bg-card">
-                    <h3 className="font-medium text-sm">Upload Bukti POD (file)</h3>
-                    <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        onChange={(e) => podForm.setData('file', e.target.files?.[0] ?? null)}
-                    />
+                <form onSubmit={submitPod} className="bg-card space-y-3 rounded-xl border p-4">
+                    <h3 className="text-sm font-medium">Upload Bukti POD (file)</h3>
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => podForm.setData('file', e.target.files?.[0] ?? null)} />
                     {podForm.errors.file && <p className="text-xs text-red-600">{podForm.errors.file}</p>}
                     <Button type="submit" size="sm" disabled={podForm.processing || !podForm.data.file}>
                         Upload POD

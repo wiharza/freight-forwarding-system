@@ -24,9 +24,7 @@ type Paginated<T> = {
     total: number;
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Daftar Job', href: '/jobs' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'Daftar Job', href: '/jobs' }];
 
 export default function JobsIndex({
     jobs,
@@ -40,10 +38,14 @@ export default function JobsIndex({
     canCreate: boolean;
 }) {
     const handleFilter = (key: string, value: string) => {
-        router.get(route('jobs.index'), {
-            ...filters,
-            [key]: value || undefined,
-        }, { preserveState: true });
+        router.get(
+            route('jobs.index'),
+            {
+                ...filters,
+                [key]: value || undefined,
+            },
+            { preserveState: true },
+        );
     };
 
     return (
@@ -53,9 +55,7 @@ export default function JobsIndex({
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h2 className="text-lg font-medium">Pengurusan Impor (Job FCL)</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            1 Job = 1 Importir + 1 B/L dengan 1..N Kontainer (§2.1, Q10).
-                        </p>
+                        <p className="text-muted-foreground mt-1 text-xs">1 Job = 1 Importir + 1 B/L dengan 1..N Kontainer (§2.1, Q10).</p>
                     </div>
 
                     {canCreate && (
@@ -66,7 +66,7 @@ export default function JobsIndex({
                 </div>
 
                 {/* Filter Bar */}
-                <div className="grid gap-3 rounded-xl border p-4 sm:grid-cols-4 text-sm bg-card">
+                <div className="bg-card grid gap-3 rounded-xl border p-4 text-sm sm:grid-cols-4">
                     <div>
                         <Input
                             placeholder="Cari No Job / B/L / Kapal..."
@@ -80,7 +80,7 @@ export default function JobsIndex({
                     </div>
                     <div>
                         <select
-                            className="w-full border rounded-md p-2 bg-background text-sm"
+                            className="bg-background w-full rounded-md border p-2 text-sm"
                             value={filters.status || ''}
                             onChange={(e) => handleFilter('status', e.target.value)}
                         >
@@ -96,7 +96,7 @@ export default function JobsIndex({
                     </div>
                     <div>
                         <select
-                            className="w-full border rounded-md p-2 bg-background text-sm"
+                            className="bg-background w-full rounded-md border p-2 text-sm"
                             value={filters.problem_flag || ''}
                             onChange={(e) => handleFilter('problem_flag', e.target.value)}
                         >
@@ -108,7 +108,7 @@ export default function JobsIndex({
                     </div>
                     <div>
                         <select
-                            className="w-full border rounded-md p-2 bg-background text-sm"
+                            className="bg-background w-full rounded-md border p-2 text-sm"
                             value={filters.importir_id || ''}
                             onChange={(e) => handleFilter('importir_id', e.target.value)}
                         >
@@ -126,7 +126,7 @@ export default function JobsIndex({
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-4 py-3">No. Job</th>
                                 <th className="px-4 py-3">Importir</th>
                                 <th className="px-4 py-3">B/L</th>
@@ -141,7 +141,7 @@ export default function JobsIndex({
                             {jobs.data.map((job) => (
                                 <tr key={job.id} className="border-b last:border-b-0">
                                     <td className="px-4 py-3 font-mono font-bold">
-                                        <Link href={route('jobs.show', job.id)} className="hover:underline text-primary">
+                                        <Link href={route('jobs.show', job.id)} className="text-primary hover:underline">
                                             {job.job_number}
                                         </Link>
                                     </td>
@@ -158,15 +158,13 @@ export default function JobsIndex({
                                         </div>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <Badge variant={job.cached_status === 'Dokumen Lengkap' ? 'default' : 'secondary'}>
-                                            {job.cached_status}
-                                        </Badge>
+                                        <Badge variant={job.cached_status === 'Dokumen Lengkap' ? 'default' : 'secondary'}>{job.cached_status}</Badge>
                                     </td>
                                     <td className="px-4 py-3">
                                         {job.problem_flag ? (
                                             <Badge variant="destructive">{job.problem_flag}</Badge>
                                         ) : (
-                                            <span className="text-xs text-muted-foreground">-</span>
+                                            <span className="text-muted-foreground text-xs">-</span>
                                         )}
                                     </td>
                                     <td className="px-4 py-3">
@@ -180,7 +178,7 @@ export default function JobsIndex({
                             ))}
                             {jobs.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-8 text-muted-foreground">
+                                    <td colSpan={8} className="text-muted-foreground py-8 text-center">
                                         Tidak ada data Job yang sesuai filter.
                                     </td>
                                 </tr>
