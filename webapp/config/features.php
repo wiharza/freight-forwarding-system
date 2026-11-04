@@ -16,6 +16,7 @@ return [
     'calculator_pib' => ['customs_specialist'],
     'approve_snapshot' => ['customs_specialist'],
     'override_fta' => ['customs_specialist'],
+    'fta_form' => ['cs', 'customs_specialist'],
 
     'job_assignment' => ['ops'],
     'verify_milestone' => ['ops'],

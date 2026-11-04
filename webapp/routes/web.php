@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Finance\InternalExchangeRateController;
 use App\Http\Controllers\Finance\InvoiceController;
+use App\Http\Controllers\FtaGateController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\PibCalculatorController;
@@ -101,6 +102,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('jobs/{job}/calculator', [PibCalculatorController::class, 'show'])->name('jobs.calculator');
     Route::post('jobs/{job}/calculator/draft', [PibCalculatorController::class, 'storeDraft'])->name('jobs.calculator.draft');
     Route::post('jobs/{job}/calculator/{declaration}/approve', [PibCalculatorController::class, 'approve'])->name('jobs.calculator.approve');
+
+    // Gerbang FTA (Tiket 10, Q19, §3.8)
+    Route::post('jobs/{job}/fta-forms', [FtaGateController::class, 'storeForm'])->name('jobs.fta-forms.store');
+    Route::get('jobs/{job}/fta-forms/{form}/download', [FtaGateController::class, 'downloadForm'])->name('jobs.fta-forms.download');
+    Route::post('jobs/{job}/calculator/{declaration}/fta-override', [FtaGateController::class, 'storeOverride'])->name('jobs.calculator.fta-override');
+    Route::post('jobs/{job}/calculator/{declaration}/fta-decision', [FtaGateController::class, 'storeDecision'])->name('jobs.calculator.fta-decision');
+    Route::patch('jobs/{job}/fta-decisions/{decision}/refund-reference', [FtaGateController::class, 'updateRefundReference'])->name('jobs.fta-decisions.refund-reference');
 
     Route::post('jobs/{job}/documents/{document}/upload', [JobController::class, 'uploadDocument'])->name('jobs.documents.upload');
     Route::post('jobs/{job}/documents/{document}/verify', [JobController::class, 'verifyDocument'])->name('jobs.documents.verify');
