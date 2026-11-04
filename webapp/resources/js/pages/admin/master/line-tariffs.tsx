@@ -1,10 +1,10 @@
+import { MasterTabs } from '@/components/master-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { MasterTabs } from '@/components/master-tabs';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 
 type Line = {
@@ -40,16 +40,8 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Tarif Line', href: '/admin/master/line-tariffs' },
 ];
 
-export default function LineTariffs({
-    lines,
-    selectedLine,
-    tariffs,
-}: {
-    lines: Line[];
-    selectedLine: Line | null;
-    tariffs: Tariff[];
-}) {
-    const authUser = usePage().props.auth.user;
+export default function LineTariffs({ lines, selectedLine, tariffs }: { lines: Line[]; selectedLine: Line | null; tariffs: Tariff[] }) {
+    const authUser = usePage<SharedData>().props.auth.user;
 
     const configForm = useForm({
         free_days_demurrage: selectedLine?.free_days_demurrage ?? 7,
@@ -100,16 +92,18 @@ export default function LineTariffs({
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-lg font-medium">Tarif Line & Konfigurasi Free Time (§4.2, §4.3)</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-muted-foreground mt-1 text-xs">
                             Tarif ber-versi dengan tanggal berlaku. Tidak ada tarif default yang di-hardcode.
                         </p>
                     </div>
 
                     <div className="w-64">
-                        <Label htmlFor="lineSelect" className="text-xs">Pilih Pelayaran</Label>
+                        <Label htmlFor="lineSelect" className="text-xs">
+                            Pilih Pelayaran
+                        </Label>
                         <select
                             id="lineSelect"
-                            className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                            className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                             value={selectedLine?.id ?? ''}
                             onChange={(e) => router.get(route('admin.master.line-tariffs', { shipping_line_id: e.target.value }))}
                         >
@@ -125,8 +119,8 @@ export default function LineTariffs({
                 {selectedLine && (
                     <div className="grid gap-6 lg:grid-cols-3">
                         {/* 1. Form Konfigurasi Free Time Line */}
-                        <div className="lg:col-span-1 rounded-xl border p-4">
-                            <h3 className="font-medium mb-3">Aturan Free Time: {selectedLine.code}</h3>
+                        <div className="rounded-xl border p-4 lg:col-span-1">
+                            <h3 className="mb-3 font-medium">Aturan Free Time: {selectedLine.code}</h3>
                             <form onSubmit={submitConfig} className="space-y-3 text-sm">
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
@@ -156,7 +150,7 @@ export default function LineTariffs({
                                         <Label htmlFor="offset_dem">Offset Demurrage</Label>
                                         <select
                                             id="offset_dem"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={configForm.data.start_offset_demurrage}
                                             onChange={(e) => configForm.setData('start_offset_demurrage', e.target.value)}
                                         >
@@ -168,7 +162,7 @@ export default function LineTariffs({
                                         <Label htmlFor="offset_det">Offset Detention</Label>
                                         <select
                                             id="offset_det"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={configForm.data.start_offset_detention}
                                             onChange={(e) => configForm.setData('start_offset_detention', e.target.value)}
                                         >
@@ -183,7 +177,7 @@ export default function LineTariffs({
                                         <Label htmlFor="cal_dem">Kalender Demurrage</Label>
                                         <select
                                             id="cal_dem"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={configForm.data.calendar_type_demurrage}
                                             onChange={(e) => configForm.setData('calendar_type_demurrage', e.target.value)}
                                         >
@@ -195,7 +189,7 @@ export default function LineTariffs({
                                         <Label htmlFor="cal_det">Kalender Detention</Label>
                                         <select
                                             id="cal_det"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={configForm.data.calendar_type_detention}
                                             onChange={(e) => configForm.setData('calendar_type_detention', e.target.value)}
                                         >
@@ -209,7 +203,7 @@ export default function LineTariffs({
                                     <Label htmlFor="mode">Mode Perhitungan</Label>
                                     <select
                                         id="mode"
-                                        className="w-full border rounded-md p-2 bg-background"
+                                        className="bg-background w-full rounded-md border p-2"
                                         value={configForm.data.mode}
                                         onChange={(e) => configForm.setData('mode', e.target.value)}
                                     >
@@ -225,15 +219,15 @@ export default function LineTariffs({
                         </div>
 
                         {/* 2. Daftar & Input Tarif Tiering */}
-                        <div className="lg:col-span-2 space-y-6">
+                        <div className="space-y-6 lg:col-span-2">
                             <div className="rounded-xl border p-4">
-                                <h3 className="font-medium mb-3">Tambah Tiering Tarif Baru (Draft)</h3>
-                                <form onSubmit={submitTariff} className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                <h3 className="mb-3 font-medium">Tambah Tiering Tarif Baru (Draft)</h3>
+                                <form onSubmit={submitTariff} className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                                     <div>
                                         <Label htmlFor="charge_type">Jenis Biaya</Label>
                                         <select
                                             id="charge_type"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={tariffForm.data.charge_type}
                                             onChange={(e) => tariffForm.setData('charge_type', e.target.value)}
                                         >
@@ -245,7 +239,7 @@ export default function LineTariffs({
                                         <Label htmlFor="size">Ukuran Kontainer</Label>
                                         <select
                                             id="size"
-                                            className="w-full border rounded-md p-2 bg-background"
+                                            className="bg-background w-full rounded-md border p-2"
                                             value={tariffForm.data.container_size}
                                             onChange={(e) => tariffForm.setData('container_size', e.target.value)}
                                         >
@@ -308,7 +302,7 @@ export default function LineTariffs({
                             <div className="overflow-x-auto rounded-xl border">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b bg-muted/50 text-left">
+                                        <tr className="bg-muted/50 border-b text-left">
                                             <th className="px-3 py-2">Jenis</th>
                                             <th className="px-3 py-2">Ukuran</th>
                                             <th className="px-3 py-2">Tier Hari</th>
@@ -336,13 +330,9 @@ export default function LineTariffs({
                                                         {t.effective_from} {t.effective_to ? `s.d ${t.effective_to}` : ''}
                                                     </td>
                                                     <td className="px-3 py-2">
-                                                        <Badge variant={t.status === 'active' ? 'default' : 'secondary'}>
-                                                            {t.status}
-                                                        </Badge>
+                                                        <Badge variant={t.status === 'active' ? 'default' : 'secondary'}>{t.status}</Badge>
                                                     </td>
-                                                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                                                        {t.creator?.name || '-'}
-                                                    </td>
+                                                    <td className="text-muted-foreground px-3 py-2 text-xs">{t.creator?.name || '-'}</td>
                                                     <td className="px-3 py-2">
                                                         {t.status === 'draft' && (
                                                             <Button
@@ -361,7 +351,7 @@ export default function LineTariffs({
                                         })}
                                         {tariffs.length === 0 && (
                                             <tr>
-                                                <td colSpan={8} className="text-center py-6 text-muted-foreground">
+                                                <td colSpan={8} className="text-muted-foreground py-6 text-center">
                                                     Belum ada tarif terdaftar untuk pelayaran ini.
                                                 </td>
                                             </tr>

@@ -38,6 +38,19 @@ export default [
         },
     },
     {
+        // File CommonJS (.cjs) — Playwright & test: butuh globals Node + require()
+        files: ['**/*.cjs'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+            },
+            sourceType: 'commonjs',
+        },
+        rules: {
+            '@typescript-eslint/no-require-imports': 'off',
+        },
+    },
+    {
         ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js'],
     },
     prettier, // Turn off all rules that might conflict with Prettier

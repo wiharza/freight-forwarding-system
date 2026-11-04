@@ -22,17 +22,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Kurs Internal', href: '/finance/rates' },
 ];
 
-export default function ExchangeRates({
-    rates,
-    activeCurrencies,
-    todayRates,
-    today,
-}: {
-    rates: RateItem[];
-    activeCurrencies: CurrencyItem[];
-    todayRates: Record<string, RateItem>;
-    today: string;
-}) {
+export default function ExchangeRates({ rates, activeCurrencies, today }: { rates: RateItem[]; activeCurrencies: CurrencyItem[]; today: string }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         rate_date: today,
         currency_code: activeCurrencies[0]?.code ?? 'USD',
@@ -53,14 +43,14 @@ export default function ExchangeRates({
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Kurs Internal Perusahaan (§6.6, Q14, Q24, ADR 0003)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Satu kurs resmi per hari per company per mata uang dengan jam cutoff (09:00). Dipisahkan dari Kurs Pajak (NDPBM).
                     </p>
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-1 rounded-xl border p-4">
-                        <h3 className="font-medium mb-3">Input Kurs Hari Ini ({today})</h3>
+                    <div className="rounded-xl border p-4 lg:col-span-1">
+                        <h3 className="mb-3 font-medium">Input Kurs Hari Ini ({today})</h3>
                         <form onSubmit={submit} className="space-y-3 text-sm">
                             <div>
                                 <Label htmlFor="rate_date">Tanggal Kurs</Label>
@@ -78,7 +68,7 @@ export default function ExchangeRates({
                                 <Label htmlFor="currency_code">Mata Uang</Label>
                                 <select
                                     id="currency_code"
-                                    className="w-full border rounded-md p-2 bg-background"
+                                    className="bg-background w-full rounded-md border p-2"
                                     value={data.currency_code}
                                     onChange={(e) => setData('currency_code', e.target.value)}
                                 >
@@ -121,10 +111,10 @@ export default function ExchangeRates({
                         </form>
                     </div>
 
-                    <div className="lg:col-span-2 overflow-x-auto rounded-xl border">
+                    <div className="overflow-x-auto rounded-xl border lg:col-span-2">
                         <table className="w-full text-sm">
                             <thead>
-                                <tr className="border-b bg-muted/50 text-left">
+                                <tr className="bg-muted/50 border-b text-left">
                                     <th className="px-3 py-2">Tanggal</th>
                                     <th className="px-3 py-2">Valas</th>
                                     <th className="px-3 py-2">Kurs (IDR)</th>
@@ -147,12 +137,12 @@ export default function ExchangeRates({
                                                 {r.is_locked ? 'Terkunci (Invoice)' : 'Bisa Diubah'}
                                             </Badge>
                                         </td>
-                                        <td className="px-3 py-2 text-xs text-muted-foreground">{r.creator?.name || '-'}</td>
+                                        <td className="text-muted-foreground px-3 py-2 text-xs">{r.creator?.name || '-'}</td>
                                     </tr>
                                 ))}
                                 {rates.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-6 text-muted-foreground">
+                                        <td colSpan={6} className="text-muted-foreground py-6 text-center">
                                             Belum ada riwayat kurs internal.
                                         </td>
                                     </tr>

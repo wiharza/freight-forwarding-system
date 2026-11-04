@@ -47,16 +47,16 @@ export default function SuratJalanCreate({ trip }: { trip: TripLite }) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Buat Surat Jalan" />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-4xl">
+            <div className="flex h-full max-w-4xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Surat Jalan — Trip {trip.trip_number}</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Job {trip.job?.job_number ?? '-'} · Vendor {trip.vendor?.name ?? '-'} · Data terisi otomatis dari trip.
                     </p>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="sj_number">No. Surat Jalan</Label>
@@ -73,32 +73,52 @@ export default function SuratJalanCreate({ trip }: { trip: TripLite }) {
                             </div>
                             <div>
                                 <Label htmlFor="driver_phone">Telp Pengemudi</Label>
-                                <Input id="driver_phone" value={data.driver_phone} onChange={(e) => setData('driver_phone', e.target.value)} required />
+                                <Input
+                                    id="driver_phone"
+                                    value={data.driver_phone}
+                                    onChange={(e) => setData('driver_phone', e.target.value)}
+                                    required
+                                />
                             </div>
                             <div>
                                 <Label htmlFor="vehicle_number">No. Kendaraan</Label>
-                                <Input id="vehicle_number" value={data.vehicle_number} onChange={(e) => setData('vehicle_number', e.target.value)} required />
+                                <Input
+                                    id="vehicle_number"
+                                    value={data.vehicle_number}
+                                    onChange={(e) => setData('vehicle_number', e.target.value)}
+                                    required
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
                         <div className="grid gap-4">
                             <div>
                                 <Label htmlFor="origin_address">Alamat Asal</Label>
-                                <Input id="origin_address" value={data.origin_address} onChange={(e) => setData('origin_address', e.target.value)} required />
+                                <Input
+                                    id="origin_address"
+                                    value={data.origin_address}
+                                    onChange={(e) => setData('origin_address', e.target.value)}
+                                    required
+                                />
                             </div>
                             <div>
                                 <Label htmlFor="destination_address">Alamat Tujuan</Label>
-                                <Input id="destination_address" value={data.destination_address} onChange={(e) => setData('destination_address', e.target.value)} required />
+                                <Input
+                                    id="destination_address"
+                                    value={data.destination_address}
+                                    onChange={(e) => setData('destination_address', e.target.value)}
+                                    required
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border p-4 space-y-3 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Kontainer Dibawa</h3>
+                    <div className="bg-card space-y-3 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Kontainer Dibawa</h3>
                         {data.containers_info.map((c, i) => (
-                            <div key={i} className="grid gap-3 sm:grid-cols-3 items-end">
+                            <div key={i} className="grid items-end gap-3 sm:grid-cols-3">
                                 <div>
                                     <Label className="text-xs">No. Kontainer</Label>
                                     <Input

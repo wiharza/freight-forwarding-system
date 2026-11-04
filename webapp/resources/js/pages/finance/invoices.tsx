@@ -42,19 +42,19 @@ export default function Invoices({ invoices, jobs }: { invoices: { data: Invoice
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Invoice (§6.4–6.5 — 3 Blok + Batas Approve)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Blok (a) pungutan negara dari Snapshot PIB (ADR 0004); Blok (b) pass-through; Blok (c) jasa + PPN DPP 11/12.
                     </p>
                 </div>
 
-                <div className="rounded-xl border p-4 space-y-3">
-                    <h3 className="font-medium text-sm">Buat Invoice Baru dari Job</h3>
+                <div className="space-y-3 rounded-xl border p-4">
+                    <h3 className="text-sm font-medium">Buat Invoice Baru dari Job</h3>
                     <div className="flex flex-wrap items-end gap-3">
                         <div className="min-w-64">
                             <Label htmlFor="job_pick">Pilih Job</Label>
                             <select
                                 id="job_pick"
-                                className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                 value={jobId}
                                 onChange={(e) => setJobId(e.target.value)}
                             >
@@ -67,14 +67,16 @@ export default function Invoices({ invoices, jobs }: { invoices: { data: Invoice
                                 ))}
                             </select>
                         </div>
-                        <Button onClick={openCreate} disabled={!jobId}>Buka Form Invoice</Button>
+                        <Button onClick={openCreate} disabled={!jobId}>
+                            Buka Form Invoice
+                        </Button>
                     </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-3 py-2">Nomor</th>
                                 <th className="px-3 py-2">Job</th>
                                 <th className="px-3 py-2">Importir</th>
@@ -89,7 +91,7 @@ export default function Invoices({ invoices, jobs }: { invoices: { data: Invoice
                         <tbody>
                             {invoices.data.length === 0 && (
                                 <tr>
-                                    <td colSpan={9} className="px-3 py-4 text-center text-muted-foreground">
+                                    <td colSpan={9} className="text-muted-foreground px-3 py-4 text-center">
                                         Belum ada invoice.
                                     </td>
                                 </tr>
@@ -103,9 +105,13 @@ export default function Invoices({ invoices, jobs }: { invoices: { data: Invoice
                                     <td className="px-3 py-2">{inv.due_date ?? '-'}</td>
                                     <td className="px-3 py-2 text-right font-mono">Rp {Number(inv.total_invoice).toLocaleString('id-ID')}</td>
                                     <td className="px-3 py-2 text-right font-mono">Rp {Number(inv.total_paid).toLocaleString('id-ID')}</td>
-                                    <td className="px-3 py-2"><Badge variant={statusColor(inv.status) as never}>{inv.status}</Badge></td>
                                     <td className="px-3 py-2">
-                                        <Link href={route('finance.invoices.show', inv.id)} className="text-xs underline">Detail</Link>
+                                        <Badge variant={statusColor(inv.status) as never}>{inv.status}</Badge>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <Link href={route('finance.invoices.show', inv.id)} className="text-xs underline">
+                                            Detail
+                                        </Link>
                                     </td>
                                 </tr>
                             ))}

@@ -1,6 +1,6 @@
+import { MasterTabs } from '@/components/master-tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MasterTabs } from '@/components/master-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -33,15 +33,15 @@ export default function MasterCurrencies({ items }: { items: Item[] }) {
                 <MasterTabs />
                 <div>
                     <h2 className="text-lg font-medium">Master Mata Uang (§6.6, Q24)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Struktur sistem siap multi-valas. Sesuai keputusan Q24, pada versi 1 hanya USD yang aktif.
                     </p>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border max-w-2xl">
+                <div className="max-w-2xl overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-4 py-3">Kode</th>
                                 <th className="px-4 py-3">Nama Mata Uang</th>
                                 <th className="px-4 py-3">Status</th>
@@ -55,17 +55,11 @@ export default function MasterCurrencies({ items }: { items: Item[] }) {
                                     <td className="px-4 py-3 font-mono font-bold">{item.code}</td>
                                     <td className="px-4 py-3">{item.name}</td>
                                     <td className="px-4 py-3">
-                                        <Badge variant={item.is_active ? 'default' : 'secondary'}>
-                                            {item.is_active ? 'Aktif' : 'Nonaktif'}
-                                        </Badge>
+                                        <Badge variant={item.is_active ? 'default' : 'secondary'}>{item.is_active ? 'Aktif' : 'Nonaktif'}</Badge>
                                     </td>
                                     <td className="px-4 py-3 text-xs">{item.effective_date || '-'}</td>
                                     <td className="px-4 py-3">
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => toggleActive(item)}
-                                        >
+                                        <Button variant="outline" size="sm" onClick={() => toggleActive(item)}>
                                             {item.is_active ? 'Nonaktifkan' : 'Aktifkan'}
                                         </Button>
                                     </td>

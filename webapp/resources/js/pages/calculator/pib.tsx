@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
+import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
 
@@ -116,7 +116,7 @@ export default function CalculatorPib({
     canCalculate: boolean;
     canApprove: boolean;
 }) {
-    const authUserId = usePage().props.auth.user.id;
+    const authUserId = usePage<SharedData>().props.auth.user.id;
     const defaultKurs = activeTaxRate ? String(activeTaxRate.rate_to_idr) : '1';
 
     const { data, setData, post, processing, errors, reset } = useForm<{
@@ -127,10 +127,16 @@ export default function CalculatorPib({
         items: [emptyItem(defaultKurs)],
     });
 
+    // Alias agar akses error per-baris dinamis (items.0.hs_code, containers.0.type, ...) typecheck.
+    const errs = errors as Record<string, string | undefined>;
+
     const addItem = () => setData('items', [...data.items, emptyItem(defaultKurs)]);
     const removeItem = (i: number) => {
         if (data.items.length <= 1) return;
-        setData('items', data.items.filter((_, idx) => idx !== i));
+        setData(
+            'items',
+            data.items.filter((_, idx) => idx !== i),
+        );
     };
     const updateItem = (i: number, field: keyof ItemRow, value: string | boolean) => {
         const next = [...data.items];
@@ -145,43 +151,46 @@ export default function CalculatorPib({
         });
     };
 
-    const canApproveThis =
-        declaration && canApprove && declaration.status === 'draft' && declaration.created_by_user_id !== authUserId;
+    const canApproveThis = declaration && canApprove && declaration.status === 'draft' && declaration.created_by_user_id !== authUserId;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Kalkulator PIB v2" />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-6xl">
+            <div className="flex h-full max-w-6xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h2 className="text-lg font-medium">Kalkulator PIB v2 — Job {job.job_number}</h2>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <p className="text-muted-foreground mt-1 text-xs">
                             {job.importir?.name ?? '-'} ({job.importir?.status_api ?? '-'}) · {job.shippingLine?.name ?? '-'}
                             {job.claim_fta ? ` · Klaim FTA ${job.fta_scheme ?? ''}` : ''}
                         </p>
                     </div>
                     {activeTaxRate && (
-                        <div className="text-xs text-muted-foreground text-right">
+                        <div className="text-muted-foreground text-right text-xs">
                             <div>Kurs Pajak aktif (NDPBM):</div>
-                            <div className="font-mono text-sm text-foreground">
+                            <div className="text-foreground font-mono text-sm">
                                 USD {Number(activeTaxRate.rate_to_idr).toLocaleString('id-ID', { maximumFractionDigits: 4 })}
                             </div>
-                            <div>{activeTaxRate.valid_from.slice(0, 10)} → {activeTaxRate.valid_to.slice(0, 10)}</div>
+                            <div>
+                                {activeTaxRate.valid_from.slice(0, 10)} → {activeTaxRate.valid_to.slice(0, 10)}
+                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Snapshot tersimpan */}
                 {declaration && (
-                    <div className="rounded-xl border p-4 space-y-3 bg-card">
+                    <div className="bg-card space-y-3 rounded-xl border p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
                             <div className="flex items-center gap-2">
-                                <h3 className="font-medium text-sm">Draf PIB v{declaration.version}</h3>
-                                <Badge variant={declaration.status === 'approved' ? 'default' : declaration.status === 'filed' ? 'secondary' : 'outline'}>
+                                <h3 className="text-sm font-medium">Draf PIB v{declaration.version}</h3>
+                                <Badge
+                                    variant={declaration.status === 'approved' ? 'default' : declaration.status === 'filed' ? 'secondary' : 'outline'}
+                                >
                                     {declaration.status}
                                 </Badge>
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-muted-foreground text-xs">
                                 Dibuat {declaration.creator?.name ?? '-'}
                                 {declaration.approver ? ` · Disetujui ${declaration.approver.name}` : ''}
                                 {declaration.incoterm ? ` · Incoterm ${declaration.incoterm}` : ''}
@@ -189,20 +198,44 @@ export default function CalculatorPib({
                         </div>
 
                         <div className="grid gap-2 text-sm sm:grid-cols-4">
-                            <div><span className="text-muted-foreground text-xs block">CIF (Valas)</span><span className="font-mono">USD {Number(declaration.total_cif_valas).toLocaleString()}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">CIF (Rp)</span><span className="font-mono">{rupiah(declaration.total_cif_idr)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">Bea Masuk</span><span className="font-mono">{rupiah(declaration.total_bm)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">PPN Impor</span><span className="font-mono">{rupiah(declaration.total_ppn)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">PPh 22</span><span className="font-mono">{rupiah(declaration.total_pph22)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">PPnBM</span><span className="font-mono">{rupiah(declaration.total_ppnbm)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">Pungutan Lain</span><span className="font-mono">{rupiah(declaration.total_pungutan_lain)}</span></div>
-                            <div><span className="text-muted-foreground text-xs block">Total Pungutan</span><span className="font-mono font-medium">{rupiah(declaration.total_pungutan)}</span></div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">CIF (Valas)</span>
+                                <span className="font-mono">USD {Number(declaration.total_cif_valas).toLocaleString()}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">CIF (Rp)</span>
+                                <span className="font-mono">{rupiah(declaration.total_cif_idr)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">Bea Masuk</span>
+                                <span className="font-mono">{rupiah(declaration.total_bm)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">PPN Impor</span>
+                                <span className="font-mono">{rupiah(declaration.total_ppn)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">PPh 22</span>
+                                <span className="font-mono">{rupiah(declaration.total_pph22)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">PPnBM</span>
+                                <span className="font-mono">{rupiah(declaration.total_ppnbm)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">Pungutan Lain</span>
+                                <span className="font-mono">{rupiah(declaration.total_pungutan_lain)}</span>
+                            </div>
+                            <div>
+                                <span className="text-muted-foreground block text-xs">Total Pungutan</span>
+                                <span className="font-mono font-medium">{rupiah(declaration.total_pungutan)}</span>
+                            </div>
                         </div>
 
                         <div className="overflow-x-auto rounded-lg border">
                             <table className="w-full text-xs">
                                 <thead>
-                                    <tr className="border-b bg-muted/50 text-left">
+                                    <tr className="bg-muted/50 border-b text-left">
                                         <th className="px-2 py-1.5">Seri</th>
                                         <th className="px-2 py-1.5">HS</th>
                                         <th className="px-2 py-1.5">CIF (Rp)</th>
@@ -218,7 +251,12 @@ export default function CalculatorPib({
                                             <td className="px-2 py-1.5">{it.item_number}</td>
                                             <td className="px-2 py-1.5 font-mono">
                                                 {it.hs_code}
-                                                {it.is_unverified_warning && <span className="text-amber-600" title="Tarif perlu verifikasi hukum"> ⚠</span>}
+                                                {it.is_unverified_warning && (
+                                                    <span className="text-amber-600" title="Tarif perlu verifikasi hukum">
+                                                        {' '}
+                                                        ⚠
+                                                    </span>
+                                                )}
                                             </td>
                                             <td className="px-2 py-1.5 font-mono">{Number(it.cif_rupiah).toLocaleString()}</td>
                                             <td className="px-2 py-1.5 text-right font-mono">{Number(it.bm_amount).toLocaleString()}</td>
@@ -247,19 +285,21 @@ export default function CalculatorPib({
                 {/* Form draf baru */}
                 {canCalculate ? (
                     <form onSubmit={submit} className="space-y-4">
-                        <div className="rounded-xl border p-4 space-y-3 bg-card">
+                        <div className="bg-card space-y-3 rounded-xl border p-4">
                             <div className="flex flex-wrap items-end gap-3">
                                 <div>
                                     <Label htmlFor="incoterm">Incoterm (data keterangan PIB)</Label>
                                     <select
                                         id="incoterm"
-                                        className="border rounded-md p-2 text-sm bg-background mt-1"
+                                        className="bg-background mt-1 rounded-md border p-2 text-sm"
                                         value={data.incoterm}
                                         onChange={(e) => setData('incoterm', e.target.value)}
                                     >
                                         <option value="">—</option>
                                         {INCOTERMS.map((ic) => (
-                                            <option key={ic} value={ic}>{ic}</option>
+                                            <option key={ic} value={ic}>
+                                                {ic}
+                                            </option>
                                         ))}
                                     </select>
                                     {errors.incoterm && <p className="text-xs text-red-600">{errors.incoterm}</p>}
@@ -271,8 +311,8 @@ export default function CalculatorPib({
 
                             <div className="space-y-3">
                                 {data.items.map((item, i) => (
-                                    <div key={i} className="rounded-lg border p-3 bg-muted/20 space-y-3">
-                                        <div className="grid gap-3 sm:grid-cols-6 items-end">
+                                    <div key={i} className="bg-muted/20 space-y-3 rounded-lg border p-3">
+                                        <div className="grid items-end gap-3 sm:grid-cols-6">
                                             <div className="sm:col-span-2">
                                                 <Label className="text-xs">Kode HS (8/10 digit)</Label>
                                                 <Input
@@ -281,9 +321,7 @@ export default function CalculatorPib({
                                                     placeholder="0301.11.00.00"
                                                     required
                                                 />
-                                                {errors[`items.${i}.hs_code`] && (
-                                                    <p className="text-xs text-red-600">{errors[`items.${i}.hs_code`]}</p>
-                                                )}
+                                                {errs[`items.${i}.hs_code`] && <p className="text-xs text-red-600">{errs[`items.${i}.hs_code`]}</p>}
                                             </div>
                                             <div className="sm:col-span-2">
                                                 <Label className="text-xs">Uraian</Label>
@@ -291,65 +329,116 @@ export default function CalculatorPib({
                                             </div>
                                             <div>
                                                 <Label className="text-xs">Valas</Label>
-                                                <Input value={item.currency_code} onChange={(e) => updateItem(i, 'currency_code', e.target.value.toUpperCase())} />
+                                                <Input
+                                                    value={item.currency_code}
+                                                    onChange={(e) => updateItem(i, 'currency_code', e.target.value.toUpperCase())}
+                                                />
                                             </div>
                                             <div>
                                                 <Label className="text-xs">Kurs Pajak</Label>
-                                                <Input type="number" step="0.0001" value={item.kurs_pajak_rate} onChange={(e) => updateItem(i, 'kurs_pajak_rate', e.target.value)} required />
+                                                <Input
+                                                    type="number"
+                                                    step="0.0001"
+                                                    value={item.kurs_pajak_rate}
+                                                    onChange={(e) => updateItem(i, 'kurs_pajak_rate', e.target.value)}
+                                                    required
+                                                />
                                             </div>
                                         </div>
-                                        <div className="grid gap-3 sm:grid-cols-6 items-end">
+                                        <div className="grid items-end gap-3 sm:grid-cols-6">
                                             <div>
                                                 <Label className="text-xs">FOB (valas)</Label>
-                                                <Input type="number" step="0.01" min="0" value={item.fob_valas} onChange={(e) => updateItem(i, 'fob_valas', e.target.value)} required />
-                                                {errors[`items.${i}.fob_valas`] && (
-                                                    <p className="text-xs text-red-600">{errors[`items.${i}.fob_valas`]}</p>
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={item.fob_valas}
+                                                    onChange={(e) => updateItem(i, 'fob_valas', e.target.value)}
+                                                    required
+                                                />
+                                                {errs[`items.${i}.fob_valas`] && (
+                                                    <p className="text-xs text-red-600">{errs[`items.${i}.fob_valas`]}</p>
                                                 )}
                                             </div>
                                             <div>
                                                 <Label className="text-xs">Freight (valas)</Label>
-                                                <Input type="number" step="0.01" min="0" value={item.freight_valas} onChange={(e) => updateItem(i, 'freight_valas', e.target.value)} required />
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={item.freight_valas}
+                                                    onChange={(e) => updateItem(i, 'freight_valas', e.target.value)}
+                                                    required
+                                                />
                                             </div>
                                             <div>
                                                 <Label className="text-xs">Asuransi</Label>
-                                                <Input type="number" step="0.01" min="0" value={item.insurance_valas} onChange={(e) => updateItem(i, 'insurance_valas', e.target.value)} />
+                                                <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={item.insurance_valas}
+                                                    onChange={(e) => updateItem(i, 'insurance_valas', e.target.value)}
+                                                />
                                             </div>
                                             <div className="sm:col-span-2">
                                                 <Label className="text-xs">Dasar Asuransi</Label>
                                                 <select
-                                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                                     value={item.insurance_basis}
                                                     onChange={(e) => updateItem(i, 'insurance_basis', e.target.value)}
                                                 >
                                                     {INSURANCE_BASES.map(([v, l]) => (
-                                                        <option key={v} value={v}>{l}</option>
+                                                        <option key={v} value={v}>
+                                                            {l}
+                                                        </option>
                                                     ))}
                                                 </select>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex-1">
                                                     <Label className="text-xs">Pungutan Lain (Rp)</Label>
-                                                    <Input type="number" step="0.01" min="0" value={item.pungutan_lain_amount} onChange={(e) => updateItem(i, 'pungutan_lain_amount', e.target.value)} />
+                                                    <Input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={item.pungutan_lain_amount}
+                                                        onChange={(e) => updateItem(i, 'pungutan_lain_amount', e.target.value)}
+                                                    />
                                                 </div>
                                                 {data.items.length > 1 && (
-                                                    <Button type="button" variant="ghost" size="icon" className="text-red-600 mt-5" onClick={() => removeItem(i)}>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="mt-5 text-red-600"
+                                                        onClick={() => removeItem(i)}
+                                                    >
                                                         <Trash2 className="size-4" />
                                                     </Button>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-4 text-xs">
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" checked={item.is_ppn_luxury} onChange={(e) => updateItem(i, 'is_ppn_luxury', e.target.checked)} />
+                                            <label className="flex cursor-pointer items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.is_ppn_luxury}
+                                                    onChange={(e) => updateItem(i, 'is_ppn_luxury', e.target.checked)}
+                                                />
                                                 Barang mewah (PPnBM)
                                             </label>
-                                            <label className="flex items-center gap-2 cursor-pointer">
-                                                <input type="checkbox" checked={item.is_pph22_exempt} onChange={(e) => updateItem(i, 'is_pph22_exempt', e.target.checked)} />
+                                            <label className="flex cursor-pointer items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.is_pph22_exempt}
+                                                    onChange={(e) => updateItem(i, 'is_pph22_exempt', e.target.checked)}
+                                                />
                                                 Bebas PPh 22 (Ps. 4)
                                             </label>
                                             {item.is_pph22_exempt && (
                                                 <Input
-                                                    className="max-w-xs h-7 text-xs"
+                                                    className="h-7 max-w-xs text-xs"
                                                     placeholder="Alasan pengecualian"
                                                     value={item.exemption_reason}
                                                     onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
@@ -368,9 +457,7 @@ export default function CalculatorPib({
                         </div>
                     </form>
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        Hanya Customs Specialist yang dapat menghitung PIB (§2.5).
-                    </p>
+                    <p className="text-muted-foreground text-sm">Hanya Customs Specialist yang dapat menghitung PIB (§2.5).</p>
                 )}
             </div>
         </AppLayout>

@@ -27,15 +27,19 @@ export default function TripsIndex({ trips, canCreate }: { trips: { data: TripRo
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-lg font-medium">Trip Trucking (§5 — cabang logistik)</h2>
-                        <p className="text-xs text-muted-foreground mt-1">discharge → DO → gate-out → terkirim → gate-in.</p>
+                        <p className="text-muted-foreground mt-1 text-xs">discharge → DO → gate-out → terkirim → gate-in.</p>
                     </div>
-                    {canCreate && <Link href={route('trips.create')}><Button>+ Trip Baru</Button></Link>}
+                    {canCreate && (
+                        <Link href={route('trips.create')}>
+                            <Button>+ Trip Baru</Button>
+                        </Link>
+                    )}
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-3 py-2">No. Trip</th>
                                 <th className="px-3 py-2">Job</th>
                                 <th className="px-3 py-2">Vendor</th>
@@ -47,7 +51,11 @@ export default function TripsIndex({ trips, canCreate }: { trips: { data: TripRo
                         </thead>
                         <tbody>
                             {trips.data.length === 0 && (
-                                <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">Belum ada trip.</td></tr>
+                                <tr>
+                                    <td colSpan={7} className="text-muted-foreground px-3 py-4 text-center">
+                                        Belum ada trip.
+                                    </td>
+                                </tr>
                             )}
                             {trips.data.map((t) => (
                                 <tr key={t.id} className="border-b last:border-b-0">
@@ -56,8 +64,14 @@ export default function TripsIndex({ trips, canCreate }: { trips: { data: TripRo
                                     <td className="px-3 py-2">{t.vendor?.name ?? '-'}</td>
                                     <td className="px-3 py-2">{t.scheduled_date}</td>
                                     <td className="px-3 py-2 font-mono text-xs">{t.containers.map((c) => c.container_number).join(', ')}</td>
-                                    <td className="px-3 py-2"><Badge variant="outline">{t.status}</Badge></td>
-                                    <td className="px-3 py-2"><Link href={route('trips.show', t.id)} className="text-xs underline">Detail</Link></td>
+                                    <td className="px-3 py-2">
+                                        <Badge variant="outline">{t.status}</Badge>
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <Link href={route('trips.show', t.id)} className="text-xs underline">
+                                            Detail
+                                        </Link>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

@@ -18,18 +18,10 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Trip Baru', href: '/trips/create' },
 ];
 
-export default function TripsCreate({
-    vendors,
-    jobs,
-    locations,
-}: {
-    vendors: VendorOption[];
-    jobs: JobOption[];
-    locations: LocationOption[];
-}) {
+export default function TripsCreate({ vendors, jobs, locations }: { vendors: VendorOption[]; jobs: JobOption[]; locations: LocationOption[] }) {
     const { data, setData, post, processing, errors } = useForm({
         job_id: '' as number | '',
-        vendor_id: vendors[0]?.id ?? ('' as number | ''),
+        vendor_id: (vendors[0]?.id ?? '') as number | '',
         trip_number: '',
         scheduled_date: new Date().toISOString().split('T')[0],
         driver_name: '',
@@ -56,25 +48,27 @@ export default function TripsCreate({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Trip Baru" />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-5xl">
+            <div className="flex h-full max-w-5xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <h2 className="text-lg font-medium">Penugasan Trip Trucking</h2>
 
                 <form onSubmit={submit} className="space-y-6">
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Job & Vendor</h3>
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Job & Vendor</h3>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="job_id">Job</Label>
                                 <select
                                     id="job_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.job_id}
                                     onChange={(e) => setData('job_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                     required
                                 >
                                     <option value="">— Pilih job —</option>
                                     {jobs.map((j) => (
-                                        <option key={j.id} value={j.id}>{j.job_number}</option>
+                                        <option key={j.id} value={j.id}>
+                                            {j.job_number}
+                                        </option>
                                     ))}
                                 </select>
                                 {errors.job_id && <p className="text-xs text-red-600">{errors.job_id}</p>}
@@ -83,43 +77,58 @@ export default function TripsCreate({
                                 <Label htmlFor="vendor_id">Vendor Trucking</Label>
                                 <select
                                     id="vendor_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.vendor_id}
                                     onChange={(e) => setData('vendor_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                     required
                                 >
                                     {vendors.map((v) => (
-                                        <option key={v.id} value={v.id}>{v.name} ({v.vendor_type})</option>
+                                        <option key={v.id} value={v.id}>
+                                            {v.name} ({v.vendor_type})
+                                        </option>
                                     ))}
                                 </select>
                             </div>
                             <div>
                                 <Label htmlFor="trip_number">No. Trip</Label>
-                                <Input id="trip_number" value={data.trip_number} onChange={(e) => setData('trip_number', e.target.value)} placeholder="TRP-20261104-001" required />
+                                <Input
+                                    id="trip_number"
+                                    value={data.trip_number}
+                                    onChange={(e) => setData('trip_number', e.target.value)}
+                                    placeholder="TRP-20261104-001"
+                                    required
+                                />
                                 {errors.trip_number && <p className="text-xs text-red-600">{errors.trip_number}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="scheduled_date">Jadwal</Label>
-                                <Input id="scheduled_date" type="date" value={data.scheduled_date} onChange={(e) => setData('scheduled_date', e.target.value)} required />
+                                <Input
+                                    id="scheduled_date"
+                                    type="date"
+                                    value={data.scheduled_date}
+                                    onChange={(e) => setData('scheduled_date', e.target.value)}
+                                    required
+                                />
                             </div>
                         </div>
                     </div>
 
-                    <div className="rounded-xl border p-4 space-y-3 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Kontainer (pilih 1..N)</h3>
-                        {!job && <p className="text-xs text-muted-foreground">Pilih job terlebih dahulu.</p>}
-                        {job && job.containers.length === 0 && <p className="text-xs text-muted-foreground">Job ini belum punya kontainer.</p>}
+                    <div className="bg-card space-y-3 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Kontainer (pilih 1..N)</h3>
+                        {!job && <p className="text-muted-foreground text-xs">Pilih job terlebih dahulu.</p>}
+                        {job && job.containers.length === 0 && <p className="text-muted-foreground text-xs">Job ini belum punya kontainer.</p>}
                         {job && job.containers.length > 0 && (
                             <div className="flex flex-wrap gap-2">
                                 {job.containers.map((c) => (
-                                    <label key={c.id} className="flex items-center gap-2 border rounded-md px-3 py-2 text-sm cursor-pointer bg-background">
-                                        <input
-                                            type="checkbox"
-                                            checked={data.container_ids.includes(c.id)}
-                                            onChange={() => toggleContainer(c.id)}
-                                        />
+                                    <label
+                                        key={c.id}
+                                        className="bg-background flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                                    >
+                                        <input type="checkbox" checked={data.container_ids.includes(c.id)} onChange={() => toggleContainer(c.id)} />
                                         <span className="font-mono">{c.container_number}</span>
-                                        <span className="text-muted-foreground">{c.size}' {c.type}</span>
+                                        <span className="text-muted-foreground">
+                                            {c.size}' {c.type}
+                                        </span>
                                     </label>
                                 ))}
                             </div>
@@ -127,20 +136,22 @@ export default function TripsCreate({
                         {errors.container_ids && <p className="text-xs text-red-600">{errors.container_ids}</p>}
                     </div>
 
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Rute & Pengemudi</h3>
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Rute & Pengemudi</h3>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="origin_location_id">Asal (depot/port)</Label>
                                 <select
                                     id="origin_location_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.origin_location_id}
                                     onChange={(e) => setData('origin_location_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                 >
                                     <option value="">—</option>
                                     {locations.map((l) => (
-                                        <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                                        <option key={l.id} value={l.id}>
+                                            {l.name} ({l.type})
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -148,13 +159,15 @@ export default function TripsCreate({
                                 <Label htmlFor="destination_location_id">Tujuan</Label>
                                 <select
                                     id="destination_location_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.destination_location_id}
                                     onChange={(e) => setData('destination_location_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                 >
                                     <option value="">—</option>
                                     {locations.map((l) => (
-                                        <option key={l.id} value={l.id}>{l.name} ({l.type})</option>
+                                        <option key={l.id} value={l.id}>
+                                            {l.name} ({l.type})
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -168,7 +181,12 @@ export default function TripsCreate({
                             </div>
                             <div>
                                 <Label htmlFor="vehicle_number">No. Kendaraan</Label>
-                                <Input id="vehicle_number" value={data.vehicle_number} onChange={(e) => setData('vehicle_number', e.target.value.toUpperCase())} placeholder="B 9123 XYZ" />
+                                <Input
+                                    id="vehicle_number"
+                                    value={data.vehicle_number}
+                                    onChange={(e) => setData('vehicle_number', e.target.value.toUpperCase())}
+                                    placeholder="B 9123 XYZ"
+                                />
                             </div>
                             <div>
                                 <Label htmlFor="notes">Catatan</Label>

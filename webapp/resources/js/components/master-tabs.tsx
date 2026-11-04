@@ -28,9 +28,7 @@ export function MasterTabs() {
                         key={tab.url}
                         href={tab.url}
                         className={
-                            active
-                                ? 'rounded-md bg-muted px-3 py-1.5 font-medium'
-                                : 'rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted/60'
+                            active ? 'bg-muted rounded-md px-3 py-1.5 font-medium' : 'text-muted-foreground hover:bg-muted/60 rounded-md px-3 py-1.5'
                         }
                     >
                         {tab.title}

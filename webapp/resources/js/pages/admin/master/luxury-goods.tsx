@@ -1,5 +1,5 @@
-import { Badge } from '@/components/ui/badge';
 import { MasterTabs } from '@/components/master-tabs';
+import { Badge } from '@/components/ui/badge';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
@@ -30,15 +30,16 @@ export default function LuxuryGoods({ items }: { items: LuxuryItem[] }) {
 
                 <div>
                     <h2 className="text-lg font-medium">Daftar Barang Mewah: PPN 12% Penuh & PPnBM (PP 73/2019, PV-6)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Dua sub-daftar terpisah: barang mewah PPN (kena 12% penuh tanpa DPP 11/12) dan barang kena PPnBM dengan ambang Nilai Impor dalam USD (§3.2).
+                    <p className="text-muted-foreground mt-1 text-xs">
+                        Dua sub-daftar terpisah: barang mewah PPN (kena 12% penuh tanpa DPP 11/12) dan barang kena PPnBM dengan ambang Nilai Impor
+                        dalam USD (§3.2).
                     </p>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border max-w-4xl">
+                <div className="max-w-4xl overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-4 py-3">Pos HS</th>
                                 <th className="px-4 py-3">Kategori</th>
                                 <th className="px-4 py-3">PPN 12% Penuh?</th>
@@ -59,17 +60,17 @@ export default function LuxuryGoods({ items }: { items: LuxuryItem[] }) {
                                         </Badge>
                                     </td>
                                     <td className="px-4 py-3">
-                                        <Badge variant={item.has_ppnbm ? 'default' : 'secondary'}>
-                                            {item.has_ppnbm ? 'Ya' : 'Tidak'}
-                                        </Badge>
+                                        <Badge variant={item.has_ppnbm ? 'default' : 'secondary'}>{item.has_ppnbm ? 'Ya' : 'Tidak'}</Badge>
                                     </td>
                                     <td className="px-4 py-3 font-mono font-medium">
                                         {item.has_ppnbm ? `${(parseFloat(item.ppnbm_rate) * 100).toFixed(0)}%` : '-'}
                                     </td>
                                     <td className="px-4 py-3 font-mono text-xs">
-                                        {item.import_value_threshold_usd ? `> USD ${parseFloat(item.import_value_threshold_usd).toLocaleString()}` : 'Tanpa Ambang'}
+                                        {item.import_value_threshold_usd
+                                            ? `> USD ${parseFloat(item.import_value_threshold_usd).toLocaleString()}`
+                                            : 'Tanpa Ambang'}
                                     </td>
-                                    <td className="px-4 py-3 text-xs text-muted-foreground">{item.legal_basis}</td>
+                                    <td className="text-muted-foreground px-4 py-3 text-xs">{item.legal_basis}</td>
                                 </tr>
                             ))}
                         </tbody>

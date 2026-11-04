@@ -23,7 +23,7 @@ export default function Exposure({ exposures }: { exposures: ExposureRow[] }) {
             <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Eksposur per Importir (§7b, Q18)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-muted-foreground mt-1 text-xs">
                         Eksposur bruto = real-cost tertagih − alokasi pembayaran. Saldo Titipan Dana ditampilkan terpisah (bukan pengurang).
                     </p>
                 </div>
@@ -31,7 +31,7 @@ export default function Exposure({ exposures }: { exposures: ExposureRow[] }) {
                 <div className="overflow-x-auto rounded-xl border">
                     <table className="w-full text-sm">
                         <thead>
-                            <tr className="border-b bg-muted/50 text-left">
+                            <tr className="bg-muted/50 border-b text-left">
                                 <th className="px-3 py-2">Importir</th>
                                 <th className="px-3 py-2 text-right">Eksposur Bruto</th>
                                 <th className="px-3 py-2 text-right">Saldo Titipan Dana</th>
@@ -39,7 +39,11 @@ export default function Exposure({ exposures }: { exposures: ExposureRow[] }) {
                         </thead>
                         <tbody>
                             {exposures.length === 0 && (
-                                <tr><td colSpan={3} className="px-3 py-4 text-center text-muted-foreground">Belum ada data.</td></tr>
+                                <tr>
+                                    <td colSpan={3} className="text-muted-foreground px-3 py-4 text-center">
+                                        Belum ada data.
+                                    </td>
+                                </tr>
                             )}
                             {exposures.map((e) => (
                                 <tr key={e.importir_id} className="border-b last:border-b-0">

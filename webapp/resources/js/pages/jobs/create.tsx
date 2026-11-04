@@ -6,7 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Trash2 } from 'lucide-react';
-import React, { useState } from 'react';
+import React from 'react';
 
 type ImportirItem = { id: number; name: string; npwp: string; status_api: string };
 type ShippingLineItem = { id: number; code: string; name: string };
@@ -55,32 +55,32 @@ export default function JobsCreate({
         eta: '',
         ata: '',
         is_fcl: true, // v1 hanya FCL (§1.2, Q2, Q10)
-        claim_fta: false,
+        claim_fta: false as boolean,
         fta_scheme: 'ACFTA',
         referensi_excel_lama: '',
         tanggal_cutover: '',
-        containers: [
-            { container_number: '', size: '20', type: 'Dry', seal_number: '', gross_weight_kg: '20000' },
-        ] as ContainerRow[],
+        containers: [{ container_number: '', size: '20', type: 'Dry', seal_number: '', gross_weight_kg: '20000' }] as ContainerRow[],
     });
+
+    // Alias agar akses error per-baris dinamis (items.0.hs_code, containers.0.type, ...) typecheck.
+    const errs = errors as Record<string, string | undefined>;
 
     const selectedVessel = vessels.find((v) => v.id === data.vessel_id);
 
     // DQ-22: ukuran & tipe dari master jenis kontainer, bukan hardcoded
     const sizeOptions = Array.from(new Set(containerTypes.map((ct) => ct.size)));
-    const typeOptionsFor = (size: string) =>
-        containerTypes.filter((ct) => ct.size === size).map((ct) => ct.type);
+    const typeOptionsFor = (size: string) => containerTypes.filter((ct) => ct.size === size).map((ct) => ct.type);
 
     const addContainer = () => {
-        setData('containers', [
-            ...data.containers,
-            { container_number: '', size: '20', type: 'Dry', seal_number: '', gross_weight_kg: '20000' },
-        ]);
+        setData('containers', [...data.containers, { container_number: '', size: '20', type: 'Dry', seal_number: '', gross_weight_kg: '20000' }]);
     };
 
     const removeContainer = (index: number) => {
         if (data.containers.length <= 1) return;
-        setData('containers', data.containers.filter((_, i) => i !== index));
+        setData(
+            'containers',
+            data.containers.filter((_, i) => i !== index),
+        );
     };
 
     const updateContainer = (index: number, field: keyof ContainerRow, value: string) => {
@@ -97,25 +97,23 @@ export default function JobsCreate({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Entri Job Baru" />
-            <div className="flex h-full flex-1 flex-col gap-6 rounded-xl p-4 max-w-5xl">
+            <div className="flex h-full max-w-5xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <div>
                     <h2 className="text-lg font-medium">Entri Order Impor Baru (1 Job = 1 Importir + 1 B/L)</h2>
-                    <p className="text-xs text-muted-foreground mt-1">
-                        Sistem versi 1 melayani Impor Laut FCL + Trucking (§1.2, Q2, Q10).
-                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs">Sistem versi 1 melayani Impor Laut FCL + Trucking (§1.2, Q2, Q10).</p>
                 </div>
 
                 <form onSubmit={submit} className="space-y-6">
                     {/* 1. Header Job */}
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
-                        <h3 className="font-medium text-sm border-b pb-2">Informasi B/L & Pihak Terkait</h3>
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
+                        <h3 className="border-b pb-2 text-sm font-medium">Informasi B/L & Pihak Terkait</h3>
 
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="importir_id">Importir (Pemilik Barang / Klien)</Label>
                                 <select
                                     id="importir_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.importir_id}
                                     onChange={(e) => setData('importir_id', parseInt(e.target.value))}
                                     required
@@ -132,7 +130,7 @@ export default function JobsCreate({
                                 <Label htmlFor="shipping_line_id">Shipping Line (Pelayaran)</Label>
                                 <select
                                     id="shipping_line_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.shipping_line_id}
                                     onChange={(e) => setData('shipping_line_id', parseInt(e.target.value))}
                                     required
@@ -156,23 +154,17 @@ export default function JobsCreate({
                                     placeholder="Contoh: SITC202611001"
                                     required
                                 />
-                                {errors.bl_number && <p className="text-xs text-red-600 mt-1">{errors.bl_number}</p>}
+                                {errors.bl_number && <p className="mt-1 text-xs text-red-600">{errors.bl_number}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="bl_date">Tanggal B/L</Label>
-                                <Input
-                                    id="bl_date"
-                                    type="date"
-                                    value={data.bl_date}
-                                    onChange={(e) => setData('bl_date', e.target.value)}
-                                    required
-                                />
+                                <Input id="bl_date" type="date" value={data.bl_date} onChange={(e) => setData('bl_date', e.target.value)} required />
                             </div>
                             <div>
                                 <Label htmlFor="pod_id">Pelabuhan Bongkar (POD)</Label>
                                 <select
                                     id="pod_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.pod_id}
                                     onChange={(e) => setData('pod_id', parseInt(e.target.value))}
                                     required
@@ -191,11 +183,9 @@ export default function JobsCreate({
                                 <Label htmlFor="vessel_id">Kapal (dari Master — anti salah ketik)</Label>
                                 <select
                                     id="vessel_id"
-                                    className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                    className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                     value={data.vessel_id}
-                                    onChange={(e) =>
-                                        setData('vessel_id', e.target.value === '' ? '' : parseInt(e.target.value))
-                                    }
+                                    onChange={(e) => setData('vessel_id', e.target.value === '' ? '' : parseInt(e.target.value))}
                                 >
                                     <option value="">— Ketik manual / belum ada di master —</option>
                                     {vessels.map((v) => (
@@ -206,7 +196,7 @@ export default function JobsCreate({
                                     ))}
                                 </select>
                                 {selectedVessel?.imo_number && (
-                                    <p className="text-xs text-muted-foreground mt-1">
+                                    <p className="text-muted-foreground mt-1 text-xs">
                                         IMO {selectedVessel.imo_number}
                                         {selectedVessel.call_sign ? ` · Call Sign ${selectedVessel.call_sign}` : ''}
                                     </p>
@@ -221,7 +211,7 @@ export default function JobsCreate({
                                     disabled={!!data.vessel_id}
                                     placeholder="Contoh: SITC SHANGHAI"
                                 />
-                                {errors.vessel_id && <p className="text-xs text-red-600 mt-1">{errors.vessel_id}</p>}
+                                {errors.vessel_id && <p className="mt-1 text-xs text-red-600">{errors.vessel_id}</p>}
                             </div>
                             <div>
                                 <Label htmlFor="voyage_number">Voyage No</Label>
@@ -235,47 +225,37 @@ export default function JobsCreate({
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <Label htmlFor="eta">ETA</Label>
-                                    <Input
-                                        id="eta"
-                                        type="date"
-                                        value={data.eta}
-                                        onChange={(e) => setData('eta', e.target.value)}
-                                    />
+                                    <Input id="eta" type="date" value={data.eta} onChange={(e) => setData('eta', e.target.value)} />
                                 </div>
                                 <div>
                                     <Label htmlFor="ata">ATA</Label>
-                                    <Input
-                                        id="ata"
-                                        type="date"
-                                        value={data.ata}
-                                        onChange={(e) => setData('ata', e.target.value)}
-                                    />
+                                    <Input id="ata" type="date" value={data.ata} onChange={(e) => setData('ata', e.target.value)} />
                                 </div>
                             </div>
                         </div>
 
                         {/* Klaim FTA */}
-                        <div className="border-t pt-3 flex flex-wrap items-center gap-4">
-                            <label className="flex items-center gap-2 text-sm cursor-pointer">
-                                <Checkbox
-                                    id="claim_fta"
-                                    checked={data.claim_fta}
-                                    onCheckedChange={(c) => setData('claim_fta', c === true)}
-                                />
+                        <div className="flex flex-wrap items-center gap-4 border-t pt-3">
+                            <label className="flex cursor-pointer items-center gap-2 text-sm">
+                                <Checkbox id="claim_fta" checked={data.claim_fta} onCheckedChange={(c) => setData('claim_fta', c === true)} />
                                 <span className="font-medium">Klaim Skema Tarif Preferensi (Form FTA)</span>
                             </label>
 
                             {data.claim_fta && (
                                 <div className="flex items-center gap-2">
-                                    <Label htmlFor="fta_scheme" className="text-xs">Skema FTA:</Label>
+                                    <Label htmlFor="fta_scheme" className="text-xs">
+                                        Skema FTA:
+                                    </Label>
                                     <select
                                         id="fta_scheme"
-                                        className="border rounded-md p-1.5 text-xs bg-background"
+                                        className="bg-background rounded-md border p-1.5 text-xs"
                                         value={data.fta_scheme}
                                         onChange={(e) => setData('fta_scheme', e.target.value)}
                                     >
                                         {ftaSchemes.map((s) => (
-                                            <option key={s} value={s}>{s}</option>
+                                            <option key={s} value={s}>
+                                                {s}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
@@ -284,11 +264,11 @@ export default function JobsCreate({
                     </div>
 
                     {/* 2. Daftar Kontainer 1..N (§2.1, Q10) */}
-                    <div className="rounded-xl border p-4 space-y-4 bg-card">
+                    <div className="bg-card space-y-4 rounded-xl border p-4">
                         <div className="flex items-center justify-between border-b pb-2">
                             <div>
-                                <h3 className="font-medium text-sm">Daftar Kontainer Fisik (1..N Kontainer)</h3>
-                                <p className="text-xs text-muted-foreground">Demurrage/Detention dihitung per Kontainer.</p>
+                                <h3 className="text-sm font-medium">Daftar Kontainer Fisik (1..N Kontainer)</h3>
+                                <p className="text-muted-foreground text-xs">Demurrage/Detention dihitung per Kontainer.</p>
                             </div>
                             <Button type="button" variant="outline" size="sm" onClick={addContainer}>
                                 + Tambah Kontainer
@@ -299,9 +279,11 @@ export default function JobsCreate({
 
                         <div className="space-y-3">
                             {data.containers.map((c, idx) => (
-                                <div key={idx} className="grid gap-3 sm:grid-cols-6 items-end rounded-lg border p-3 bg-muted/20">
+                                <div key={idx} className="bg-muted/20 grid items-end gap-3 rounded-lg border p-3 sm:grid-cols-6">
                                     <div className="sm:col-span-2">
-                                        <Label htmlFor={`container_number_${idx}`} className="text-xs">Nomor Kontainer</Label>
+                                        <Label htmlFor={`container_number_${idx}`} className="text-xs">
+                                            Nomor Kontainer
+                                        </Label>
                                         <Input
                                             id={`container_number_${idx}`}
                                             value={c.container_number}
@@ -309,15 +291,17 @@ export default function JobsCreate({
                                             placeholder="Contoh: MSKU1234567"
                                             required
                                         />
-                                        {errors[`containers.${idx}.container_number`] && (
-                                            <p className="text-xs text-red-600 mt-1">{errors[`containers.${idx}.container_number`]}</p>
+                                        {errs[`containers.${idx}.container_number`] && (
+                                            <p className="mt-1 text-xs text-red-600">{errs[`containers.${idx}.container_number`]}</p>
                                         )}
                                     </div>
                                     <div>
-                                        <Label htmlFor={`container_size_${idx}`} className="text-xs">Ukuran</Label>
+                                        <Label htmlFor={`container_size_${idx}`} className="text-xs">
+                                            Ukuran
+                                        </Label>
                                         <select
                                             id={`container_size_${idx}`}
-                                            className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                            className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                             value={c.size}
                                             onChange={(e) => {
                                                 const nextSize = e.target.value;
@@ -327,36 +311,42 @@ export default function JobsCreate({
                                                 next[idx] = {
                                                     ...next[idx],
                                                     size: nextSize,
-                                                    type: validTypes.includes(next[idx].type)
-                                                        ? next[idx].type
-                                                        : (validTypes[0] ?? ''),
+                                                    type: validTypes.includes(next[idx].type) ? next[idx].type : (validTypes[0] ?? ''),
                                                 };
                                                 setData('containers', next);
                                             }}
                                         >
                                             {sizeOptions.map((s) => (
-                                                <option key={s} value={s}>{s}'</option>
+                                                <option key={s} value={s}>
+                                                    {s}'
+                                                </option>
                                             ))}
                                         </select>
                                     </div>
                                     <div>
-                                        <Label htmlFor={`container_type_${idx}`} className="text-xs">Tipe</Label>
+                                        <Label htmlFor={`container_type_${idx}`} className="text-xs">
+                                            Tipe
+                                        </Label>
                                         <select
                                             id={`container_type_${idx}`}
-                                            className="w-full border rounded-md p-2 text-sm bg-background mt-1"
+                                            className="bg-background mt-1 w-full rounded-md border p-2 text-sm"
                                             value={c.type}
                                             onChange={(e) => updateContainer(idx, 'type', e.target.value)}
                                         >
                                             {typeOptionsFor(c.size).map((t) => (
-                                                <option key={t} value={t}>{t}</option>
+                                                <option key={t} value={t}>
+                                                    {t}
+                                                </option>
                                             ))}
                                         </select>
-                                        {errors[`containers.${idx}.type`] && (
-                                            <p className="text-xs text-red-600 mt-1">{errors[`containers.${idx}.type`]}</p>
+                                        {errs[`containers.${idx}.type`] && (
+                                            <p className="mt-1 text-xs text-red-600">{errs[`containers.${idx}.type`]}</p>
                                         )}
                                     </div>
                                     <div>
-                                        <Label htmlFor={`container_seal_${idx}`} className="text-xs">No. Seal</Label>
+                                        <Label htmlFor={`container_seal_${idx}`} className="text-xs">
+                                            No. Seal
+                                        </Label>
                                         <Input
                                             id={`container_seal_${idx}`}
                                             value={c.seal_number}
@@ -366,7 +356,9 @@ export default function JobsCreate({
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <div className="flex-1">
-                                            <Label htmlFor={`container_weight_${idx}`} className="text-xs">Berat (KG)</Label>
+                                            <Label htmlFor={`container_weight_${idx}`} className="text-xs">
+                                                Berat (KG)
+                                            </Label>
                                             <Input
                                                 id={`container_weight_${idx}`}
                                                 type="number"
@@ -380,7 +372,7 @@ export default function JobsCreate({
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
-                                                className="text-red-600 mt-5"
+                                                className="mt-5 text-red-600"
                                                 onClick={() => removeContainer(idx)}
                                             >
                                                 <Trash2 className="size-4" />
