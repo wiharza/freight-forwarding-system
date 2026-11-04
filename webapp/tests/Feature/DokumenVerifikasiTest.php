@@ -23,9 +23,11 @@ use Tests\TestCase;
  * Tes perbaikan verifikasi dokumen Job: bug Cancel pada prompt verifikasi
  * (perilaku frontend — diverifikasi lewat review kode), tombol Unduh/Lihat,
  * dan Batalkan Verifikasi (unverify) dengan alasan wajib + audit.
- * Relaksasi 2026-11-04 (keputusan user): verifikator asli BOLEH membatalkan
- * verifikasinya sendiri — ADR 0006 maker-checker dilonggarkan KHUSUS untuk
- * unverify (koreksi, bukan persetujuan); verify tidak berubah.
+ * Cakupan unverify (keputusan user 2026-11-05, temuan audit P2-4): HANYA
+ * verifikator asli ATAU Admin (override) yang boleh membatalkan verifikasi.
+ * Ops/Finance lain ditolak 403. Alasan wajib + audit tetap berlaku.
+ * Verify tidak berubah (maker-checker verify ditegakkan di server pada
+ * Milestone::verify()).
  */
 class DokumenVerifikasiTest extends TestCase
 {
@@ -137,8 +139,12 @@ class DokumenVerifikasiTest extends TestCase
     // Batalkan verifikasi (unverify)
     // ------------------------------------------------------------------
 
+    /**
+     * Cakupan dipersempit 2026-11-05 (P2-4): Ops yang BUKAN verifikator
+     * asli tidak boleh membatalkan verifikasi orang lain.
+     */
     #[Test]
-    public function unverify_oleh_ops_lain_berhasil_dan_tercatat_di_audit(): void
+    public function unverify_oleh_ops_lain_ditolak(): void
     {
         $this->unggah($this->cs);
         $this->verifikasi($this->ops1);
@@ -147,22 +153,15 @@ class DokumenVerifikasiTest extends TestCase
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
             ['reason' => 'Ternyata nomor B/L salah ketik, periksa ulang.'],
         );
-        $response->assertSessionHasNoErrors();
+        $response->assertForbidden();
 
         $doc = $this->doc->fresh();
-        $this->assertSame(JobDocument::STATUS_DIUPLOAD, $doc->status);
-        $this->assertNull($doc->verified_by_user_id);
-        $this->assertNull($doc->verified_at);
-
-        $audit = AuditTrail::query()
+        $this->assertSame(JobDocument::STATUS_DIVERIFIKASI, $doc->status);
+        $this->assertSame($this->ops1->id, $doc->verified_by_user_id);
+        $this->assertFalse(AuditTrail::query()
             ->where('action', 'job_document.unverified')
             ->where('object_id', $this->doc->id)
-            ->firstOrFail();
-        $this->assertSame('Ternyata nomor B/L salah ketik, periksa ulang.', $audit->reason);
-        $this->assertSame($this->ops2->id, $audit->user_id);
-
-        // Setelah dibatalkan, dokumen bisa diverifikasi lagi.
-        $this->verifikasi($this->ops2);
+            ->exists());
     }
 
     #[Test]
@@ -179,8 +178,12 @@ class DokumenVerifikasiTest extends TestCase
         $this->assertSame(JobDocument::STATUS_DIUPLOAD, $this->doc->fresh()->status);
     }
 
+    /**
+     * Cakupan dipersempit 2026-11-05 (P2-4): Finance yang bukan
+     * verifikator asli (dan bukan Admin) tidak boleh membatalkan.
+     */
     #[Test]
-    public function unverify_oleh_finance_berhasil(): void
+    public function unverify_oleh_finance_lain_ditolak(): void
     {
         $this->unggah($this->cs);
         $this->verifikasi($this->ops1);
@@ -189,14 +192,14 @@ class DokumenVerifikasiTest extends TestCase
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
             ['reason' => 'Dokumen tidak sesuai, verifikasi dibatalkan.'],
         );
-        $response->assertSessionHasNoErrors();
-        $this->assertSame(JobDocument::STATUS_DIUPLOAD, $this->doc->fresh()->status);
+        $response->assertForbidden();
+        $this->assertSame(JobDocument::STATUS_DIVERIFIKASI, $this->doc->fresh()->status);
     }
 
     /**
-     * Relaksasi ADR 0006 khusus unverify (keputusan user 2026-11-04):
-     * verifikator asli BOLEH membatalkan verifikasinya sendiri, dengan
-     * alasan wajib + audit. Pembatalan adalah koreksi, bukan persetujuan.
+     * Cakupan unverify (keputusan user 2026-11-05, P2-4): verifikator
+     * asli BOLEH membatalkan verifikasinya sendiri, dengan alasan wajib
+     * + audit. Pembatalan adalah koreksi, bukan persetujuan.
      */
     #[Test]
     public function unverify_oleh_verifikator_asli_diperbolehkan_dengan_alasan_dan_audit(): void
@@ -227,7 +230,7 @@ class DokumenVerifikasiTest extends TestCase
     }
 
     /**
-     * Verify TIDAK berubah oleh relaksasi unverify: setelah verifikator
+     * Verify TIDAK berubah oleh cakupan unverify: setelah verifikator
      * asli membatalkan verifikasinya sendiri, ia tetap bisa memverifikasi
      * ulang dokumen yang sama (endpoint verify tidak mendapat pembatasan
      * baru). Maker-checker verify yang sesungguhnya ditegakkan di sisi
@@ -258,7 +261,9 @@ class DokumenVerifikasiTest extends TestCase
         $this->unggah($this->cs);
         $this->verifikasi($this->ops1);
 
-        $response = $this->actingAs($this->ops2)->post(
+        // Pemanggil harus lolos aturan cakupan (verifikator asli) supaya
+        // sampai ke validasi alasan — Ops lain sudah ditolak 403 duluan.
+        $response = $this->actingAs($this->ops1)->post(
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
             [],
         );
@@ -271,7 +276,9 @@ class DokumenVerifikasiTest extends TestCase
     {
         $this->unggah($this->cs);
 
-        $response = $this->actingAs($this->ops2)->post(
+        // Dokumen belum diverifikasi sehingga tidak ada verifikator asli;
+        // Admin (override) dipakai supaya sampai ke pengecekan status.
+        $response = $this->actingAs($this->admin)->post(
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
             ['reason' => 'Belum diverifikasi kok dibatalkan.'],
         );
@@ -291,7 +298,9 @@ class DokumenVerifikasiTest extends TestCase
             'close_reason' => 'Selesai.',
         ]);
 
-        $response = $this->actingAs($this->ops2)->post(
+        // Pemanggil harus lolos aturan cakupan (verifikator asli) supaya
+        // sampai ke pengecekan kunci tutup.
+        $response = $this->actingAs($this->ops1)->post(
             route('jobs.documents.unverify', [$this->job->id, $this->doc->id]),
             ['reason' => 'Job sudah tertutup.'],
         );
@@ -313,7 +322,9 @@ class DokumenVerifikasiTest extends TestCase
         $docLain = $jobLain->documents()->firstOrFail();
         $docLain->markVerified($this->ops1);
 
-        $response = $this->actingAs($this->ops2)->post(
+        // Pemanggil adalah verifikator dokumen lain itu sendiri, supaya
+        // sampai ke pengecekan kepemilikan dokumen terhadap Job di URL.
+        $response = $this->actingAs($this->ops1)->post(
             route('jobs.documents.unverify', [$this->job->id, $docLain->id]),
             ['reason' => 'Dokumen job lain.'],
         );

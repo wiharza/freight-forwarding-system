@@ -225,10 +225,12 @@ class JobController extends Controller
             'fieldUsers' => $fieldUsers,
             'canAssignField' => $request->user()->can('job_assignment'),
             'canVerifyDoc' => $request->user()->can('verify_milestone'),
-            // Pembatalan verifikasi: pemegang ability verifikasi (Ops) ATAU
-            // Admin/Finance — verifikator asli BOLEH membatalkan
-            // verifikasinya sendiri (relaksasi ADR 0006 khusus unverify,
-            // keputusan user 2026-11-04; alasan wajib + audit).
+            // Pembatalan verifikasi (cakupan dipersempit 2026-11-05,
+            // temuan audit P2-4): hanya verifikator asli ATAU Admin
+            // (override) yang boleh membatalkan — penegakan di sisi
+            // server pada unverifyDocument. Prop ini hanya gerbang
+            // tampilnya tombol (Ops/Admin/Finance); aktif/nonaktif per
+            // dokumen dihitung di UI dari verifikator dan role Admin.
             'canUnverifyDoc' => $request->user()->can('verify_milestone')
                 || $request->user()->hasAnyRole([Role::ADMIN, Role::FINANCE]),
             // Penutupan Job (§2.3, Q11): status tiap syarat close secara live.
@@ -344,8 +346,14 @@ class JobController extends Controller
     {
         $user = $request->user();
 
-        if (! $user->can('verify_milestone') && ! $user->hasAnyRole([Role::ADMIN, Role::FINANCE])) {
-            abort(403, 'Hanya Ops, Admin, atau Finance yang boleh membatalkan verifikasi dokumen.');
+        // Cakupan unverify dipersempit (keputusan user 2026-11-05, temuan
+        // audit P2-4): hanya verifikator asli ATAU Admin (override) yang
+        // boleh membatalkan verifikasi. Ops/Finance lain ditolak 403.
+        // Alasan wajib + audit tetap berlaku (lihat markUnverified).
+        $isOriginalVerifier = (int) $document->verified_by_user_id === (int) $user->id;
+
+        if (! $isOriginalVerifier && ! $user->hasRole(Role::ADMIN)) {
+            abort(403, 'Hanya verifikator asli atau Admin yang boleh membatalkan verifikasi dokumen ini.');
         }
 
         Gate::authorize('view', $job);
