@@ -379,6 +379,37 @@ class TemuanTambahanTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Temuan #5 — PPh 22 emas batangan 0,25% (PMK 51/2025, Lampiran D)
+    // ------------------------------------------------------------------
+
+    #[Test]
+    public function emas_batangan_dikenai_pph22_0_25_persen(): void
+    {
+        Pph22Rule::create([
+            'company_id' => $this->company->id,
+            'hs_code' => '71.08',
+            'lampiran' => 'D',
+            'rate' => 0.0025,
+            'verification_status' => Pph22Rule::STATUS_VERIFIED,
+        ]);
+
+        $res = (new PibCalculator)->calculateItem([
+            'hs_code' => '71081000',
+            'currency_code' => 'USD',
+            'fob_valas' => 10000,
+            'freight_valas' => 0,
+            'insurance_basis' => 'input_riil',
+            'insurance_valas' => 0,
+            'kurs_pajak_rate' => 16000,
+        ], 'API-U');
+
+        // CIF Rp160.000.000 × 0,25% = Rp400.000 (sebelum perbaikan: 2,5% = Rp4.000.000)
+        $this->assertSame('emas_batangan_0.25', $res['pph22_category']);
+        $this->assertEqualsWithDelta(0.0025, (float) $res['pph22_rate'], 0.0001);
+        $this->assertEqualsWithDelta(400000, (float) $res['pph22_amount'], 0.01);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

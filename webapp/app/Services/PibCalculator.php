@@ -189,7 +189,17 @@ class PibCalculator
                     // Komoditas khusus (kedelai, gandum, tepung terigu)
                     $pphCategory = 'kedelai_gandum_0.5';
                     $pphRate = $hasApi ? 0.0050 : 0.0750;
+                } elseif ($rule->lampiran === 'D') {
+                    // TEMUAN #5 (2026-11-04): emas batangan 0,25% (PMK
+                    // 51/2025 Pasal 3 ayat (1), HS 71.08, Lampiran D seed)
+                    // dengan atau tanpa API. Sebelumnya cabang ini tidak ada
+                    // sehingga emas batangan jatuh ke tarif umum 2,5% (10x).
+                    $pphCategory = 'emas_batangan_0.25';
+                    $pphRate = 0.0025;
                 }
+                // Catatan: barang lelang (7,5% dari HARGA JUAL LELANG, PMK
+                // 51/2025) sengaja belum ditangani — basisnya bukan Nilai
+                // Impor dan model belum punya field harga lelang.
             } else {
                 // Kategori umum: 2.5% dengan API, 7.5% tanpa API
                 if ($hasApi) {
