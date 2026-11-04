@@ -23,6 +23,25 @@ class Trip extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    /**
+     * Transisi status yang diizinkan (temuan #6, 2026-11-04): rantai
+     * assigned → confirmed → in_transit → delivered; cancelled hanya dari
+     * assigned/confirmed. Status delivered/cancelled bersifat final —
+     * tidak ada jalan kembali maupun lompatan tahapan.
+     */
+    public const ALLOWED_TRANSITIONS = [
+        self::STATUS_ASSIGNED => [self::STATUS_CONFIRMED, self::STATUS_CANCELLED],
+        self::STATUS_CONFIRMED => [self::STATUS_IN_TRANSIT, self::STATUS_CANCELLED],
+        self::STATUS_IN_TRANSIT => [self::STATUS_DELIVERED],
+        self::STATUS_DELIVERED => [],
+        self::STATUS_CANCELLED => [],
+    ];
+
+    public function canTransitionTo(string $status): bool
+    {
+        return in_array($status, self::ALLOWED_TRANSITIONS[$this->status] ?? [], true);
+    }
+
     protected $fillable = [
         'job_id',
         'vendor_id',

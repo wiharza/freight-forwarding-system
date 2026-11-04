@@ -41,6 +41,10 @@ class InvoiceController extends Controller
     public function create(Job $job): Response
     {
         Gate::authorize('invoice');
+        // HARDENING 2026-11-04 (temuan #1): pembuatan invoice juga wajib
+        // lolos akses Job — sebelumnya hanya ability global, sehingga Job
+        // perusahaan lain bisa dibuka lewat route binding.
+        Gate::authorize('view', $job);
 
         // HARDENING 2026-11-04: preview memakai SATU definisi billable yang
         // sama dengan store() (Job::billableCosts) — sebelumnya filter preview
@@ -57,6 +61,9 @@ class InvoiceController extends Controller
     public function store(Request $request, Job $job): RedirectResponse
     {
         Gate::authorize('invoice');
+        // HARDENING 2026-11-04 (temuan #1): sama seperti create() — store
+        // invoice wajib lolos akses Job.
+        Gate::authorize('view', $job);
 
         $data = $request->validate([
             'invoice_date' => ['required', 'date'],
@@ -304,6 +311,18 @@ class InvoiceController extends Controller
             // yang sama menunggu di sini sampai transaksi ini selesai.
             $payment = Payment::query()->lockForUpdate()->findOrFail($payment->id);
             $invoice = Invoice::query()->lockForUpdate()->findOrFail($data['invoice_id']);
+
+            // TEMUAN #3 (2026-11-04): pembayaran hanya boleh dialokasikan ke
+            // invoice milik importir yang SAMA. Sebelumnya endpoint hanya
+            // memeriksa item milik invoice — payment importir A bisa
+            // dialokasikan ke invoice importir B tanpa jejak. Cek dilakukan
+            // di dalam transaksi setelah lock, sebelum baris apa pun dibuat,
+            // sehingga penolakan tidak menyisakan alokasi setengah jalan.
+            if ((int) $payment->importir_id !== (int) $invoice->importir_id) {
+                throw ValidationException::withMessages([
+                    'invoice_id' => 'Pembayaran ini milik importir lain dan tidak dapat dialokasikan ke invoice ini.',
+                ]);
+            }
 
             // Hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran
             // ini agar alokasi bertahap (batch terpisah) tidak bisa melampaui
