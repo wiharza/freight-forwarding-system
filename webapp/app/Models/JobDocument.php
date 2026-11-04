@@ -13,23 +13,36 @@ class JobDocument extends Model
     use BelongsToCompany, HasFactory;
 
     public const PHASE_PRA_FILING = 'pra_filing';
+
     public const PHASE_PASCA_FILING = 'pasca_filing';
+
     public const PHASE_PASCA_DELIVERY = 'pasca_delivery';
 
     public const STATUS_BELUM_ADA = 'belum_ada';
+
     public const STATUS_DIUPLOAD = 'diupload';
+
     public const STATUS_DIVERIFIKASI = 'diverifikasi';
+
     public const STATUS_TIDAK_BERLAKU = 'tidak_berlaku';
 
     // Jenis dokumen standar FCL (§2.4, Q21)
     public const TYPE_INVOICE = 'invoice';
+
     public const TYPE_PACKING_LIST = 'packing_list';
+
     public const TYPE_BL = 'bl';
+
     public const TYPE_FORM_FTA = 'form_fta';
+
     public const TYPE_DO = 'do';
+
     public const TYPE_SPPB = 'sppb';
+
     public const TYPE_GATE_OUT_PROOF = 'gate_out_proof';
+
     public const TYPE_GATE_IN_PROOF = 'gate_in_proof';
+
     public const TYPE_POD = 'pod';
 
     protected $fillable = [

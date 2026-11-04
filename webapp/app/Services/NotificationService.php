@@ -2,11 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\Company;
 use App\Models\Container;
-use App\Models\Milestone;
 use App\Models\NotificationLog;
 use App\Models\TelegramConfig;
+use App\Support\CompanyContext;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
@@ -51,7 +50,7 @@ class NotificationService
         }
 
         NotificationLog::query()->create([
-            'company_id' => app(\App\Support\CompanyContext::class)->id(),
+            'company_id' => app(CompanyContext::class)->id(),
             'channel' => NotificationLog::CHANNEL_EMAIL,
             'recipient' => $to,
             'recipient_name' => $toName,

@@ -8,7 +8,7 @@ use App\Models\Trip;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\SuratJalan>
+ * @extends Factory<SuratJalan>
  */
 class SuratJalanFactory extends Factory
 {
@@ -19,7 +19,7 @@ class SuratJalanFactory extends Factory
         return [
             'company_id' => Company::factory(),
             'trip_id' => Trip::factory(),
-            'sj_number' => 'SJ-' . $this->faker->unique()->numerify('######'),
+            'sj_number' => 'SJ-'.$this->faker->unique()->numerify('######'),
             'sj_date' => $this->faker->date(),
             'driver_name' => $this->faker->name(),
             'driver_phone' => $this->faker->phoneNumber(),

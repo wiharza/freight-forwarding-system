@@ -9,6 +9,7 @@ use App\Models\LineTariff;
 use App\Models\ShippingLine;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use PHPUnit\Framework\Attributes\Test;
@@ -20,9 +21,13 @@ class LineTariffAndRatesTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $admin1;
+
     private User $admin2;
+
     private User $finance;
+
     private ShippingLine $line;
 
     protected function setUp(): void
@@ -191,7 +196,7 @@ class LineTariffAndRatesTest extends TestCase
         ]);
 
         // Cek resolve untuk hari ini (belum ada kurs 2026-11-03)
-        $resolved = InternalExchangeRate::resolveRate('USD', \Illuminate\Support\Carbon::parse('2026-11-03'));
+        $resolved = InternalExchangeRate::resolveRate('USD', Carbon::parse('2026-11-03'));
         $this->assertEquals('15800.0000', $resolved['rate']);
         $this->assertFalse($resolved['is_official_today']); // draf flag §6.6
 
@@ -203,7 +208,7 @@ class LineTariffAndRatesTest extends TestCase
             'rate_to_idr' => '15850.0000',
         ]);
 
-        $resolvedToday = InternalExchangeRate::resolveRate('USD', \Illuminate\Support\Carbon::parse('2026-11-03'));
+        $resolvedToday = InternalExchangeRate::resolveRate('USD', Carbon::parse('2026-11-03'));
         $this->assertEquals('15850.0000', $resolvedToday['rate']);
         $this->assertTrue($resolvedToday['is_official_today']);
     }

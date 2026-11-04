@@ -3,20 +3,19 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomsDeclaration;
-use App\Models\CustomsItem;
 use App\Models\FtaTariff;
 use App\Models\Job;
 use App\Models\TaxExchangeRate;
 use App\Services\PibCalculator;
 use App\Support\Audit;
 use App\Support\FormatRules;
-use Carbon\Carbon;
+use App\Support\MakerChecker;
+use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
-use Closure;
 
 class PibCalculatorController extends Controller
 {
@@ -83,7 +82,7 @@ class PibCalculatorController extends Controller
         $declaration = CustomsDeclaration::query()->create([
             'company_id' => $companyId,
             'job_id' => $job->id,
-            'pib_number' => 'PIB-DRAFT-' . $job->job_number,
+            'pib_number' => 'PIB-DRAFT-'.$job->job_number,
             'version' => 1,
             'status' => CustomsDeclaration::STATUS_DRAFT,
             'kmk_number' => $kmk,
@@ -121,7 +120,7 @@ class PibCalculatorController extends Controller
     {
         Gate::authorize('approve_snapshot');
 
-        \App\Support\MakerChecker::assertApproverDiffers($request->user(), $declaration);
+        MakerChecker::assertApproverDiffers($request->user(), $declaration);
 
         $declaration->update([
             'status' => CustomsDeclaration::STATUS_APPROVED,
@@ -156,7 +155,7 @@ class PibCalculatorController extends Controller
             // DQ-22: periode NDPBM selalu Rabu s.d. Selasa (PV-3)
             'valid_from' => [
                 'required', 'date',
-                function (string $attribute, mixed $value, \Closure $fail): void {
+                function (string $attribute, mixed $value, Closure $fail): void {
                     if ((int) date('N', strtotime((string) $value)) !== 3) {
                         $fail('Periode Kurs Pajak NDPBM selalu dimulai hari Rabu (PV-3).');
                     }
@@ -164,7 +163,7 @@ class PibCalculatorController extends Controller
             ],
             'valid_to' => [
                 'required', 'date', 'after_or_equal:valid_from',
-                function (string $attribute, mixed $value, \Closure $fail) use ($request): void {
+                function (string $attribute, mixed $value, Closure $fail) use ($request): void {
                     $from = strtotime((string) $request->input('valid_from'));
                     $to = strtotime((string) $value);
                     if ($from !== false && $to !== false && ($to - $from) !== 6 * 86400) {

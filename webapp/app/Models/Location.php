@@ -11,7 +11,9 @@ class Location extends Model
     use BelongsToCompany, HasFactory;
 
     public const TYPE_PORT = 'port';
+
     public const TYPE_DEPOT = 'depot';
+
     public const TYPE_WAREHOUSE = 'warehouse';
 
     protected $fillable = [

@@ -7,7 +7,7 @@ use App\Models\Importir;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Importir>
+ * @extends Factory<Importir>
  */
 class ImportirFactory extends Factory
 {

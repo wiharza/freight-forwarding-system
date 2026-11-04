@@ -7,7 +7,7 @@ use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Vendor>
+ * @extends Factory<Vendor>
  */
 class VendorFactory extends Factory
 {
@@ -17,7 +17,7 @@ class VendorFactory extends Factory
     {
         return [
             'company_id' => Company::factory(),
-            'name' => $this->faker->company() . ' Trucking',
+            'name' => $this->faker->company().' Trucking',
             'vendor_type' => 'eksternal',
             'contact_person' => $this->faker->name(),
             'phone' => $this->faker->phoneNumber(),

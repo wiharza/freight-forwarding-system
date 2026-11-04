@@ -10,6 +10,8 @@ use App\Models\NotificationLog;
 use App\Models\ShippingLine;
 use App\Models\TelegramConfig;
 use App\Models\User;
+use App\Services\NotificationService;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -19,8 +21,11 @@ class NotificationTest extends TestCase
     use RefreshDatabase;
 
     private Company $company;
+
     private User $finance;
+
     private Job $job;
+
     private Container $c1;
 
     protected function setUp(): void
@@ -28,7 +33,7 @@ class NotificationTest extends TestCase
         parent::setUp();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance = User::factory()->create(['company_id' => $this->company->id]);
 
@@ -56,7 +61,7 @@ class NotificationTest extends TestCase
     #[Test]
     public function notifikasi_email_tercatat_di_log(): void
     {
-        app(\App\Services\NotificationService::class)->sendEmail(
+        app(NotificationService::class)->sendEmail(
             'admin@example.local',
             'Admin',
             'Test Alarm',

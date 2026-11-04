@@ -4,13 +4,15 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Container;
+use App\Models\ContainerDeposit;
 use App\Models\Importir;
 use App\Models\Job;
 use App\Models\JobCost;
-use App\Models\ContainerDeposit;
-use App\Models\UangMuka;
+use App\Models\ShippingLine;
 use App\Models\TitipanDana;
+use App\Models\UangMuka;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -21,10 +23,15 @@ class LedgerDepositUangMukaTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $finance;
+
     private User $ops;
+
     private Importir $importir;
+
     private Job $job;
+
     private Container $c1;
 
     protected function setUp(): void
@@ -34,7 +41,7 @@ class LedgerDepositUangMukaTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance = User::factory()->create(['company_id' => $this->company->id]);
         $this->finance->roles()->sync([$this->roleId('finance')]);
@@ -43,7 +50,7 @@ class LedgerDepositUangMukaTest extends TestCase
         $this->ops->roles()->sync([$this->roleId('ops')]);
 
         $this->importir = Importir::factory()->create(['company_id' => $this->company->id]);
-        $line = \App\Models\ShippingLine::factory()->create(['company_id' => $this->company->id]);
+        $line = ShippingLine::factory()->create(['company_id' => $this->company->id]);
 
         $this->job = Job::factory()->create([
             'company_id' => $this->company->id,

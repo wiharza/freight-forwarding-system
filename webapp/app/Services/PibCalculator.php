@@ -92,7 +92,7 @@ class PibCalculator
                 ->where('effective_from', '<=', $filingDate->toDateString())
                 ->where(function ($q) use ($filingDate) {
                     $q->whereNull('effective_to')
-                      ->orWhere('effective_to', '>=', $filingDate->toDateString());
+                        ->orWhere('effective_to', '>=', $filingDate->toDateString());
                 })
                 ->first();
 
@@ -112,7 +112,7 @@ class PibCalculator
                 ->where('effective_from', '<=', $filingDate->toDateString())
                 ->where(function ($q) use ($filingDate) {
                     $q->whereNull('effective_to')
-                      ->orWhere('effective_to', '>=', $filingDate->toDateString());
+                        ->orWhere('effective_to', '>=', $filingDate->toDateString());
                 })
                 ->first();
 

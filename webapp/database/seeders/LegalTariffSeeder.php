@@ -39,7 +39,7 @@ class LegalTariffSeeder extends Seeder
                             'lampiran' => $lampiran,
                             'rate' => $decimalRate,
                             'verification_status' => Pph22Rule::STATUS_VERIFIED,
-                            'legal_basis' => 'PMK 51/2025 Lampiran ' . $lampiran,
+                            'legal_basis' => 'PMK 51/2025 Lampiran '.$lampiran,
                         ]
                     );
                 }
@@ -86,7 +86,7 @@ class LegalTariffSeeder extends Seeder
                     'effective_from' => '2023-01-01',
                     'effective_to' => '2027-12-31',
                     'verification_status' => FtaTariff::STATUS_VERIFIED,
-                    'legal_basis' => 'PMK 88/2023 Skema ' . $f['scheme'],
+                    'legal_basis' => 'PMK 88/2023 Skema '.$f['scheme'],
                 ]
             );
         }

@@ -12,7 +12,9 @@ class NotificationLog extends Model
     use BelongsToCompany, HasFactory;
 
     public const CHANNEL_EMAIL = 'email';
+
     public const CHANNEL_TELEGRAM = 'telegram';
+
     public const CHANNEL_BADGE = 'badge';
 
     protected $fillable = [
@@ -40,11 +42,11 @@ class NotificationLog extends Model
     protected static function booted(): void
     {
         static::updating(function () {
-            throw new \LogicException('Log notifikasi bersifat append-only.');
+            throw new LogicException('Log notifikasi bersifat append-only.');
         });
 
         static::deleting(function () {
-            throw new \LogicException('Log notifikasi tidak dapat dihapus.');
+            throw new LogicException('Log notifikasi tidak dapat dihapus.');
         });
     }
 }

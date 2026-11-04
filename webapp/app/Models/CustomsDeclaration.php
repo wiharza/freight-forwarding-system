@@ -13,8 +13,11 @@ class CustomsDeclaration extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_FILED = 'filed';
+
     public const STATUS_STALE = 'stale';
 
     protected $fillable = [

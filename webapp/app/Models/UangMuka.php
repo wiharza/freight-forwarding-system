@@ -12,7 +12,9 @@ class UangMuka extends Model
     use BelongsToCompany, HasFactory;
 
     public const METHOD_TRANSFER = 'transfer';
+
     public const METHOD_KAS = 'kas';
+
     public const METHOD_BILLING_CODE_LANGSUNG = 'billing_code_langsung';
 
     protected $fillable = [

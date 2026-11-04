@@ -8,6 +8,7 @@ use App\Models\LuxuryGood;
 use App\Models\MfnTariff;
 use App\Models\Pph22Rule;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Database\Seeders\LegalTariffSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +21,9 @@ class LegalTariffTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $admin1;
+
     private User $admin2;
 
     protected function setUp(): void
@@ -38,7 +41,7 @@ class LegalTariffTest extends TestCase
         $this->admin2->roles()->sync([$this->roleId('admin')]);
 
         // Jalankan LegalTariffSeeder
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
         $this->seed(LegalTariffSeeder::class);
     }
 

@@ -16,14 +16,21 @@ class Milestone extends Model
     use BelongsToCompany, HasFactory;
 
     public const BRANCH_PABEAN = 'pabean';
+
     public const BRANCH_LOGISTIK = 'logistik';
 
     public const TYPE_DISCHARGE = 'discharge';
+
     public const TYPE_DO_RELEASE = 'do_release';
+
     public const TYPE_PIB_FILED = 'pib_filed';
+
     public const TYPE_SPPB = 'sppb';
+
     public const TYPE_GATE_OUT_FULL = 'gate_out_full';
+
     public const TYPE_DELIVERED = 'delivered';
+
     public const TYPE_GATE_IN_EMPTY = 'gate_in_empty';
 
     protected $fillable = [

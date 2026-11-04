@@ -9,7 +9,7 @@ use App\Models\Vendor;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Trip>
+ * @extends Factory<Trip>
  */
 class TripFactory extends Factory
 {
@@ -21,7 +21,7 @@ class TripFactory extends Factory
             'company_id' => Company::factory(),
             'job_id' => Job::factory(),
             'vendor_id' => Vendor::factory(),
-            'trip_number' => 'TRP-' . $this->faker->unique()->numerify('######'),
+            'trip_number' => 'TRP-'.$this->faker->unique()->numerify('######'),
             'scheduled_date' => $this->faker->dateTimeBetween('now', '+30 days'),
             'status' => 'assigned',
             'driver_name' => $this->faker->name(),

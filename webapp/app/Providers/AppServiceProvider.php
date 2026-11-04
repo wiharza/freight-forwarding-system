@@ -2,11 +2,7 @@
 
 namespace App\Providers;
 
-use App\Models\Job;
-use App\Models\Trip;
 use App\Models\User;
-use App\Policies\JobPolicy;
-use App\Policies\TripPolicy;
 use App\Support\CompanyContext;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Gate;

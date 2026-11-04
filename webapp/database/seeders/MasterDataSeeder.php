@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Company;
 use App\Models\ContainerType;
 use App\Models\Currency;
 use App\Models\Importir;

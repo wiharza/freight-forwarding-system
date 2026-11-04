@@ -14,9 +14,13 @@ class Trip extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_ASSIGNED = 'assigned';
+
     public const STATUS_CONFIRMED = 'confirmed';
+
     public const STATUS_IN_TRANSIT = 'in_transit';
+
     public const STATUS_DELIVERED = 'delivered';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [

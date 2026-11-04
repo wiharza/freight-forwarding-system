@@ -11,6 +11,7 @@ use App\Models\LineTariff;
 use App\Models\Milestone;
 use App\Models\ShippingLine;
 use App\Services\DemurrageCalculator;
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -22,9 +23,13 @@ class DemurrageEngineTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private ShippingLine $line;
+
     private Job $job;
+
     private Container $c20;
+
     private DemurrageCalculator $calc;
 
     protected function setUp(): void
@@ -34,7 +39,7 @@ class DemurrageEngineTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->calc = app(DemurrageCalculator::class);
 

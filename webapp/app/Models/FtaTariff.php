@@ -14,6 +14,7 @@ class FtaTariff extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_VERIFIED = 'terverifikasi';
+
     public const STATUS_UNVERIFIED = 'perlu_verifikasi';
 
     // 9 skema FTA aktif per Nov 2026 (§3.5, PV-9)

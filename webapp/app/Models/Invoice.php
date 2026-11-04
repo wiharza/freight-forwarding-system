@@ -16,8 +16,11 @@ class Invoice extends Model
     use BelongsToCompany, HasFactory;
 
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_APPROVED = 'approved';
+
     public const STATUS_LOCKED = 'locked';
+
     public const STATUS_CANCELLED = 'cancelled';
 
     protected $fillable = [

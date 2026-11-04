@@ -11,6 +11,7 @@ use App\Models\ShippingLine;
 use App\Models\Vendor;
 use App\Models\Vessel;
 use App\Support\Audit;
+use App\Support\CompanyContext;
 use App\Support\FormatRules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,7 +34,7 @@ class MasterDataController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'npwp' => [
                 ...FormatRules::npwpRules(), // DQ-20: 15 digit / 16 digit NIK
-                Rule::unique('importirs')->where('company_id', app(\App\Support\CompanyContext::class)->id()),
+                Rule::unique('importirs')->where('company_id', app(CompanyContext::class)->id()),
             ],
             'nib' => ['nullable', 'string', 'max:50'],
             'status_api' => ['required', Rule::in(['API-U', 'API-P', 'NON-API'])],
@@ -158,7 +159,7 @@ class MasterDataController extends Controller
         $data = $request->validate([
             'name' => [
                 'required', 'string', 'max:100',
-                Rule::unique('vessels')->where('company_id', app(\App\Support\CompanyContext::class)->id()),
+                Rule::unique('vessels')->where('company_id', app(CompanyContext::class)->id()),
             ],
             'imo_number' => FormatRules::imoRules(),
             'call_sign' => ['nullable', 'string', 'max:10'],
