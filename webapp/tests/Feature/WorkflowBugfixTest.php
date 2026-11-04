@@ -14,10 +14,12 @@ use App\Models\Milestone;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\ShippingLine;
-use App\Models\TitipanDana;
 use App\Models\Trip;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Models\VendorInvoice;
 use App\Services\PibCalculator;
+use App\Support\CompanyContext;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -45,12 +47,19 @@ class WorkflowBugfixTest extends TestCase
     use RefreshDatabase, SeedsRoles;
 
     private Company $company;
+
     private User $finance;
+
     private User $cs;
+
     private User $ops;
+
     private User $field;
+
     private Importir $importir;
+
     private Job $job;
+
     private Container $c1;
 
     protected function setUp(): void
@@ -60,7 +69,7 @@ class WorkflowBugfixTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
-        app(\App\Support\CompanyContext::class)->set($this->company->id);
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->finance = User::factory()->create(['company_id' => $this->company->id]);
         $this->finance->roles()->sync([$this->roleId('finance')]);
@@ -267,9 +276,30 @@ class WorkflowBugfixTest extends TestCase
             'job_id' => $this->job->id,
         ]);
 
+        // BUGFIX 2026-11-04: tabel pivot trip_vendor_invoice tidak pernah ada
+        // di migrasi — Trip show 500 "no such table" walau nama relasi sudah
+        // diperbaiki. Buktikan pivot benar-benar bekerja: tautkan satu
+        // vendor invoice lalu pastikan tampil di halaman.
+        $vendorInvoice = VendorInvoice::create([
+            'company_id' => $this->company->id,
+            'vendor_id' => Vendor::factory()->create(['company_id' => $this->company->id])->id,
+            'invoice_number' => 'VINV-TEST-001',
+            'invoice_date' => '2026-11-05',
+            'currency_code' => 'USD',
+            'amount_usd' => 500,
+            'rate_to_idr' => 16000,
+            'amount_idr' => 8000000,
+            'created_by_user_id' => $this->ops->id,
+        ]);
+        $trip->vendorInvoices()->attach($vendorInvoice->id);
+
         $response = $this->actingAs($this->ops)->get(route('trips.show', $trip->id));
 
         $response->assertOk(); // sebelumnya 500 RelationNotFoundException (vendorInvoices)
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('trips/show')
+            ->has('trip.vendor_invoices', 1)
+        );
     }
 
     // ------------------------------------------------------------------

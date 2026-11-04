@@ -8,7 +8,9 @@ use App\Models\Invoice;
 use App\Models\Job;
 use App\Models\JobCost;
 use App\Models\PaymentAllocation;
+use App\Models\Role;
 use App\Models\TitipanDana;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -20,7 +22,7 @@ class ReportController extends Controller
     {
         // §7 akses: Ops melihat (a); Field tidak ada akses laporan
         $user = $request->user();
-        if ($user->hasRole(\App\Models\Role::FIELD) && $user->roles()->count() === 1) {
+        if ($user->hasRole(Role::FIELD) && $user->roles()->count() === 1) {
             abort(403, 'Field tidak memiliki akses laporan.');
         }
 
@@ -174,8 +176,11 @@ class ReportController extends Controller
                 // default — gateOut yang terjadi SETELAH ata menghasilkan
                 // selisih negatif sehingga max(0, negatif − free) selalu 0
                 // dan laporan selalu menampilkan 0 hari. Pakai nilai absolut.
-                $demDays = $gateOut && $job->ata ? \Carbon\Carbon::parse($gateOut->occurred_at)->diffInDays(\Carbon\Carbon::parse($job->ata), true) : 0;
-                $detDays = ($gateIn && $gateOut) ? \Carbon\Carbon::parse($gateIn->occurred_at)->diffInDays(\Carbon\Carbon::parse($gateOut->occurred_at), true) : 0;
+                // Carbon 3 juga mengembalikan PECAHAN hari bila jamnya beda
+                // (mis. 11,4166 hari) — demurrage/detention dihitung per hari
+                // kalender penuh, jadi bulatkan ke bawah ke bilangan bulat.
+                $demDays = $gateOut && $job->ata ? (int) Carbon::parse($gateOut->occurred_at)->diffInDays(Carbon::parse($job->ata), true) : 0;
+                $detDays = ($gateIn && $gateOut) ? (int) Carbon::parse($gateIn->occurred_at)->diffInDays(Carbon::parse($gateOut->occurred_at), true) : 0;
 
                 $summary->push([
                     'line' => $job->shippingLine->code,
@@ -218,7 +223,7 @@ class ReportController extends Controller
                     'forfeit_usd' => (float) $d->forfeit_amount_usd,
                     'paid_date' => $d->paid_date?->toDateString(),
                     'returned_date' => $d->returned_date?->toDateString(),
-                    'days_held' => $d->paid_date ? now()->diffInDays($d->paid_date) : 0,
+                    'days_held' => $d->paid_date ? (int) now()->diffInDays($d->paid_date, true) : 0,
                 ];
             });
 

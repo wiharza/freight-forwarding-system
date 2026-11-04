@@ -39,7 +39,7 @@ class VendorInvoice extends Model
             'waiting_charge_usd' => 'decimal:4',
             'include_toll' => 'boolean',
             'include_unloading' => 'boolean',
-        };
+        ];
     }
 
     public function vendor(): BelongsTo
