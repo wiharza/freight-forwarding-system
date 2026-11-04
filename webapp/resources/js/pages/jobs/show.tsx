@@ -321,7 +321,7 @@ export default function JobsShow({
             </td>
             <td className="max-w-[220px] overflow-hidden px-3 py-2 text-xs">
                 {d.file_name ? (
-                    <span className="block truncate font-mono text-primary" title={d.file_name}>
+                    <span className="text-primary block truncate font-mono" title={d.file_name}>
                         {d.file_name}
                     </span>
                 ) : (
