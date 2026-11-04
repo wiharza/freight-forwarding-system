@@ -146,6 +146,9 @@ export default function JobsShow({
     canReopen: boolean;
 }) {
     const authUser = usePage<SharedData>().props.auth.user;
+    // Role login dibagikan sebagai prop `roles` (HandleInertiaRequests).
+    // Dipakai untuk aturan unverify: hanya verifikator asli atau Admin.
+    const isAdmin = ((usePage<SharedData>().props.roles as string[] | undefined) ?? []).includes('admin');
     const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [showMilestoneModal, setShowMilestoneModal] = useState(false);
@@ -381,7 +384,12 @@ export default function JobsShow({
                         size="sm"
                         variant="outline"
                         onClick={() => handleUnverifyDoc(d.id)}
-                        title="Batalkan verifikasi — status kembali ke diupload, alasan wajib dan tercatat di audit"
+                        disabled={authUser?.id !== d.verifier?.id && !isAdmin}
+                        title={
+                            authUser?.id === d.verifier?.id || isAdmin
+                                ? 'Batalkan verifikasi — status kembali ke diupload, alasan wajib dan tercatat di audit'
+                                : 'Hanya verifikator asli atau Admin yang boleh membatalkan verifikasi ini'
+                        }
                     >
                         <Undo2 className="mr-1 size-3" /> Batalkan Verifikasi
                     </Button>
