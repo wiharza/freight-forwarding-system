@@ -94,12 +94,12 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">{stats.jobs_active}</div>
-                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            <div className="text-muted-foreground mt-2 space-y-1 text-sm">
                                 {statusEntries.length === 0 && <div>Belum ada Job aktif.</div>}
                                 {statusEntries.map(([status, total]) => (
                                     <div key={status} className="flex justify-between gap-2">
                                         <span className="truncate">{status}</span>
-                                        <span className="font-medium text-foreground">{total}</span>
+                                        <span className="text-foreground font-medium">{total}</span>
                                     </div>
                                 ))}
                             </div>
@@ -112,12 +112,12 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">{stats.jobs_with_flag}</div>
-                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            <div className="text-muted-foreground mt-2 space-y-1 text-sm">
                                 {Object.entries(stats.flags).length === 0 && <div>Tidak ada Problem Flag.</div>}
                                 {Object.entries(stats.flags).map(([flag, total]) => (
                                     <div key={flag} className="flex justify-between gap-2">
                                         <span className="truncate">{flag}</span>
-                                        <span className="font-medium text-foreground">{total}</span>
+                                        <span className="text-foreground font-medium">{total}</span>
                                     </div>
                                 ))}
                             </div>
@@ -130,7 +130,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                         </CardHeader>
                         <CardContent>
                             <div className="text-3xl font-bold">{stats.free_time.overdue + stats.free_time.urgent}</div>
-                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                            <div className="text-muted-foreground mt-2 space-y-1 text-sm">
                                 <div className="flex justify-between gap-2">
                                     <span>Lewat batas</span>
                                     <span className="font-medium text-red-600">{stats.free_time.overdue} kontainer</span>
@@ -141,12 +141,12 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                                 </div>
                                 <div className="flex justify-between gap-2">
                                     <span>Aman</span>
-                                    <span className="font-medium text-foreground">{stats.free_time.ok} kontainer</span>
+                                    <span className="text-foreground font-medium">{stats.free_time.ok} kontainer</span>
                                 </div>
                                 {stats.free_time.unavailable > 0 && (
                                     <div className="flex justify-between gap-2">
                                         <span>Tidak terhitung (kurs belum diatur)</span>
-                                        <span className="font-medium text-foreground">{stats.free_time.unavailable} Job</span>
+                                        <span className="text-foreground font-medium">{stats.free_time.unavailable} Job</span>
                                     </div>
                                 )}
                             </div>
@@ -160,8 +160,8 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold">{unpaid.count}</div>
-                                <div className="mt-2 text-sm text-muted-foreground">
-                                    Total tunggakan: <span className="font-medium text-foreground">Rp {unpaid.total.toLocaleString('id-ID')}</span>
+                                <div className="text-muted-foreground mt-2 text-sm">
+                                    Total tunggakan: <span className="text-foreground font-medium">Rp {unpaid.total.toLocaleString('id-ID')}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -172,7 +172,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold">{stats.unread_notifications}</div>
-                                <div className="mt-2 text-sm text-muted-foreground">
+                                <div className="text-muted-foreground mt-2 text-sm">
                                     <Link href={route('notifications.index')} className="underline">
                                         Buka kotak masuk notifikasi
                                     </Link>
@@ -188,12 +188,12 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                     </CardHeader>
                     <CardContent>
                         {jobs.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">Belum ada Job aktif.</p>
+                            <p className="text-muted-foreground text-sm">Belum ada Job aktif.</p>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead>
-                                        <tr className="border-b text-left text-muted-foreground">
+                                        <tr className="text-muted-foreground border-b text-left">
                                             <th className="py-2 pr-4 font-medium">Job</th>
                                             <th className="py-2 pr-4 font-medium">Importir</th>
                                             <th className="py-2 pr-4 font-medium">Status</th>
@@ -217,7 +217,9 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                                                         {job.problem_flag ? <Badge variant="destructive">{job.problem_flag}</Badge> : '—'}
                                                     </td>
                                                     <td className="py-2">
-                                                        <span className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${toneClass[ft.tone]}`}>
+                                                        <span
+                                                            className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${toneClass[ft.tone]}`}
+                                                        >
                                                             {ft.text}
                                                         </span>
                                                     </td>
@@ -237,7 +239,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                     </CardHeader>
                     <CardContent>
                         {activity.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">Belum ada aktivitas tercatat.</p>
+                            <p className="text-muted-foreground text-sm">Belum ada aktivitas tercatat.</p>
                         ) : (
                             <ul className="space-y-2 text-sm">
                                 {activity.map((item) => (
@@ -248,7 +250,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                                         </span>
                                         {item.user_name && <span className="text-muted-foreground">oleh {item.user_name}</span>}
                                         {item.reason && <span className="text-muted-foreground">— {item.reason}</span>}
-                                        <span className="ml-auto text-xs text-muted-foreground">{item.created_at ?? ''}</span>
+                                        <span className="text-muted-foreground ml-auto text-xs">{item.created_at ?? ''}</span>
                                     </li>
                                 ))}
                             </ul>

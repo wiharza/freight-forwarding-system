@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\AuditTrail;
 use App\Models\Company;
 use App\Models\FtaForm;
 use App\Models\Importir;

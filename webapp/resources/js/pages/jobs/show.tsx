@@ -232,7 +232,7 @@ export default function JobsShow({
 
     const renderMetaFields = () => {
         const doc = job.documents.find((x) => x.id === (selectedDocId ?? editingDocId));
-        const fields = doc ? DOC_METADATA_FIELDS[doc.document_type] ?? [] : [];
+        const fields = doc ? (DOC_METADATA_FIELDS[doc.document_type] ?? []) : [];
         return fields.map((field) => (
             <div key={field.key} className="flex flex-col gap-1">
                 <Label htmlFor={`doc-meta-${field.key}`} className="text-xs whitespace-nowrap">
@@ -288,12 +288,16 @@ export default function JobsShow({
         Object.entries(docMeta).forEach(([key, value]) => {
             if (value !== '') metadata[key] = value;
         });
-        router.post(route('jobs.documents.metadata', { job: job.id, document: documentId }), { metadata }, {
-            onSuccess: () => {
-                setEditingDocId(null);
-                setDocMeta({});
+        router.post(
+            route('jobs.documents.metadata', { job: job.id, document: documentId }),
+            { metadata },
+            {
+                onSuccess: () => {
+                    setEditingDocId(null);
+                    setDocMeta({});
+                },
             },
-        });
+        );
     };
 
     const handleVerifyDoc = (documentId: number) => {
@@ -379,7 +383,10 @@ export default function JobsShow({
     // Skema isian data terstruktur per jenis dokumen — CERMIN dari
     // App\Support\DocumentMetadata::SCHEMAS di server (sumber kebenaran
     // validasi). Ubah di kedua tempat bila menambah jenis/isian.
-    const DOC_METADATA_FIELDS: Record<string, { key: string; label: string; type: 'text' | 'date' | 'number' | 'integer' | 'select'; options?: string[] }[]> = {
+    const DOC_METADATA_FIELDS: Record<
+        string,
+        { key: string; label: string; type: 'text' | 'date' | 'number' | 'integer' | 'select'; options?: string[] }[]
+    > = {
         invoice: [
             { key: 'nomor_invoice', label: 'No. Invoice', type: 'text' },
             { key: 'tanggal_invoice', label: 'Tgl. Invoice', type: 'date' },

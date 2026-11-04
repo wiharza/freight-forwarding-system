@@ -78,6 +78,7 @@ class DashboardController extends Controller
                 if ($freeTimeByJob[$job->id]['unavailable']) {
                     $freeTimeStats['unavailable']++;
                 }
+
                 continue;
             }
 
