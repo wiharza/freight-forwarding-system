@@ -15,6 +15,7 @@ use App\Models\Vessel;
 use App\Services\DemurrageCalculator;
 use App\Services\JobClose;
 use App\Support\Audit;
+use App\Support\DocumentMetadata;
 use App\Support\FormatRules;
 use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
@@ -215,6 +216,19 @@ class JobController extends Controller
 
         $demurrageData = $calculator->calculateForJob($job);
 
+        // Isian data dokumen: ringkasan satu baris + nilai awal form
+        // (prefill dari data Job / Form FTA yang sudah ada).
+        foreach ($job->documents as $doc) {
+            $doc->setAttribute(
+                'metadata_summary',
+                DocumentMetadata::summary(is_array($doc->metadata) ? $doc->metadata : [], $doc->document_type)
+            );
+            $doc->setAttribute(
+                'metadata_prefill',
+                DocumentMetadata::prefill($job, $doc->document_type, is_array($doc->metadata) ? $doc->metadata : [])
+            );
+        }
+
         $fieldUsers = User::query()
             ->whereHas('roles', fn ($q) => $q->where('slug', Role::FIELD))
             ->get(['id', 'name']);
@@ -259,6 +273,12 @@ class JobController extends Controller
             'metadata' => ['nullable', 'array'],
         ]);
 
+        // Isian data terstruktur per jenis dokumen — kunci tak dikenal
+        // atau nilai salah tipe ditolak 422 (DocumentMetadata).
+        $metadata = $request->has('metadata')
+            ? DocumentMetadata::validate($request->input('metadata'), $document->document_type)
+            : null;
+
         // HARDENING 2026-11-04: file disimpan di disk privat 'local', bukan
         // 'public' — path lama documents/{company_id}/{job_id} bisa ditebak
         // dan diunduh siapa pun lewat /storage/ tanpa login.
@@ -270,7 +290,10 @@ class JobController extends Controller
             'status' => JobDocument::STATUS_DIUPLOAD,
             'uploaded_by_user_id' => $request->user()->id,
             'uploaded_at' => now(),
-            'metadata' => $request->input('metadata'),
+            // Upload ulang tanpa metadata TIDAK menghapus data yang sudah
+            // tersimpan (sebelumnya $request->input('metadata') yang null
+            // menimpa metadata lama menjadi null).
+            'metadata' => $metadata ?? $document->metadata,
         ]);
 
         Audit::record('job_document.uploaded', $document, ['file_name' => $document->file_name]);
@@ -377,6 +400,44 @@ class JobController extends Controller
         }
 
         $document->markUnverified($user, $data['reason']);
+
+        return redirect()->back();
+    }
+
+    /**
+     * Perbarui isian data terstruktur dokumen tanpa mengunggah ulang file.
+     * Validasi memakai skema per jenis yang sama seperti upload
+     * (DocumentMetadata): kunci tak dikenal / nilai salah tipe → 422.
+     * Dokumen yang sudah diverifikasi TIDAK boleh diubah datanya — data
+     * adalah bagian dari yang diverifikasi, jadi batalkan verifikasi dulu
+     * (lalu verifikasi ulang setelah koreksi). Job tertutup terkunci.
+     */
+    public function updateDocumentMetadata(Request $request, Job $job, JobDocument $document): RedirectResponse
+    {
+        Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): ubah data dokumen adalah tulis.
+        JobClose::assertNotClosed($job);
+
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
+
+        if ($document->status === JobDocument::STATUS_DIVERIFIKASI) {
+            throw ValidationException::withMessages([
+                'metadata' => 'Dokumen yang sudah diverifikasi tidak bisa diubah datanya — batalkan verifikasi dulu, lalu verifikasi ulang setelah koreksi.',
+            ]);
+        }
+
+        $request->validate([
+            'metadata' => ['required', 'array'],
+        ]);
+
+        $metadata = DocumentMetadata::validate($request->input('metadata'), $document->document_type);
+
+        $document->update(['metadata' => $metadata]);
+
+        Audit::record('job_document.metadata_updated', $document, ['metadata' => $metadata]);
 
         return redirect()->back();
     }

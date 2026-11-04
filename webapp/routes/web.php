@@ -120,6 +120,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('jobs/{job}/documents/{document}/upload', [JobController::class, 'uploadDocument'])->name('jobs.documents.upload');
     Route::post('jobs/{job}/documents/{document}/verify', [JobController::class, 'verifyDocument'])->name('jobs.documents.verify');
     Route::post('jobs/{job}/documents/{document}/unverify', [JobController::class, 'unverifyDocument'])->name('jobs.documents.unverify');
+    Route::post('jobs/{job}/documents/{document}/metadata', [JobController::class, 'updateDocumentMetadata'])->name('jobs.documents.metadata');
     Route::get('jobs/{job}/documents/{document}/download', [JobController::class, 'downloadDocument'])->name('jobs.documents.download');
     Route::get('jobs/{job}/documents/{document}/preview', [JobController::class, 'previewDocument'])->name('jobs.documents.preview');
     Route::patch('jobs/{job}/problem-flag', [JobController::class, 'updateProblemFlag'])->name('jobs.problem-flag');
