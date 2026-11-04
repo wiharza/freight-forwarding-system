@@ -309,6 +309,9 @@ export default function JobsCreate({
                                             placeholder="Contoh: MSKU1234567"
                                             required
                                         />
+                                        {errors[`containers.${idx}.container_number`] && (
+                                            <p className="text-xs text-red-600 mt-1">{errors[`containers.${idx}.container_number`]}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <Label htmlFor={`container_size_${idx}`} className="text-xs">Ukuran</Label>
