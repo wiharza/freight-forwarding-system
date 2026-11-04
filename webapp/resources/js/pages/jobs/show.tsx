@@ -104,6 +104,9 @@ type JobDetail = {
     fta_scheme: string | null;
     problem_flag: 'Hold' | 'Dispute' | 'Dokumen Bermasalah' | null;
     cached_status: string;
+    closed_at: string | null;
+    closed_by: { id: number; name: string } | null;
+    close_reason: string | null;
     importir: { id: number; name: string; npwp: string; status_api: string } | null;
     shipping_line: { id: number; code: string; name: string } | null;
     vessel: { id: number; name: string; imo_number: string | null; call_sign: string | null } | null;
@@ -114,18 +117,31 @@ type JobDetail = {
     fields: { id: number; name: string }[];
 };
 
+type ClosePrecondition = {
+    key: string;
+    label: string;
+    passed: boolean;
+    detail: string | null;
+};
+
 export default function JobsShow({
     job,
     demurrage,
     fieldUsers,
     canAssignField,
     canVerifyDoc,
+    closePreconditions,
+    canClose,
+    canReopen,
 }: {
     job: JobDetail;
     demurrage?: DemurrageData;
     fieldUsers: { id: number; name: string }[];
     canAssignField: boolean;
     canVerifyDoc: boolean;
+    closePreconditions: ClosePrecondition[];
+    canClose: boolean;
+    canReopen: boolean;
 }) {
     const authUser = usePage<SharedData>().props.auth.user;
     const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
@@ -143,6 +159,14 @@ export default function JobsShow({
 
     const flagForm = useForm({
         problem_flag: job.problem_flag || '',
+        reason: '',
+    });
+
+    const closeForm = useForm({
+        reason: '',
+    });
+
+    const reopenForm = useForm({
         reason: '',
     });
 
@@ -164,6 +188,22 @@ export default function JobsShow({
     const handleUpdateFlag = (e: React.FormEvent) => {
         e.preventDefault();
         flagForm.patch(route('jobs.problem-flag', job.id));
+    };
+
+    const handleCloseJob = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (
+            !confirm(
+                'Tutup Job ini? Job yang tertutup terkunci untuk penulisan (milestone, biaya, invoice, dokumen) dan hanya bisa dibuka kembali oleh Admin/Finance dengan alasan.',
+            )
+        )
+            return;
+        closeForm.post(route('jobs.close', job.id));
+    };
+
+    const handleReopenJob = (e: React.FormEvent) => {
+        e.preventDefault();
+        reopenForm.post(route('jobs.reopen', job.id));
     };
 
     const handleUploadDoc = (documentId: number) => {
@@ -314,7 +354,13 @@ export default function JobsShow({
                             </Button>
                         </Link>
 
-                        <Button size="sm" variant="outline" onClick={() => setShowMilestoneModal(true)}>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowMilestoneModal(true)}
+                            disabled={!!job.closed_at}
+                            title={job.closed_at ? 'Job tertutup — milestone terkunci (§2.3)' : 'Catat milestone'}
+                        >
                             <PlusCircle className="mr-1.5 size-4" /> + Catat Milestone
                         </Button>
 
@@ -336,6 +382,78 @@ export default function JobsShow({
                         </form>
                     </div>
                 </div>
+
+                {/* Penutupan Job (§2.3, Q11) */}
+                {(job.closed_at || canClose || canReopen) && (
+                    <div className="bg-card space-y-3 rounded-xl border p-4 shadow-sm">
+                        {job.closed_at ? (
+                            <>
+                                <h3 className="text-base font-semibold">Job Ditutup (Closed)</h3>
+                                <p className="text-sm">
+                                    Ditutup oleh <span className="font-medium">{job.closed_by?.name || '-'}</span> pada{' '}
+                                    <span className="font-mono">{job.closed_at.slice(0, 16).replace('T', ' ')}</span>
+                                    {job.close_reason && (
+                                        <>
+                                            {' — '}alasan: <span className="font-medium">{job.close_reason}</span>
+                                        </>
+                                    )}
+                                </p>
+                                <p className="text-muted-foreground text-xs">
+                                    Job tertutup terkunci untuk penulisan: milestone, biaya, invoice, dan dokumen tidak bisa lagi diubah.
+                                </p>
+                                {canReopen && (
+                                    <form onSubmit={handleReopenJob} className="flex flex-wrap items-end gap-2 border-t pt-3">
+                                        <div className="min-w-64 flex-1">
+                                            <Label htmlFor="reopen_reason">Alasan pembukaan kembali (wajib, tercatat di audit trail)</Label>
+                                            <Input
+                                                id="reopen_reason"
+                                                value={reopenForm.data.reason}
+                                                onChange={(e) => reopenForm.setData('reason', e.target.value)}
+                                                placeholder="Contoh: invoice susulan ditemukan setelah close"
+                                                required
+                                            />
+                                        </div>
+                                        <Button type="submit" variant="outline" disabled={reopenForm.processing}>
+                                            Buka Kembali Job
+                                        </Button>
+                                    </form>
+                                )}
+                            </>
+                        ) : canClose ? (
+                            <>
+                                <h3 className="text-base font-semibold">Penutupan Job (§2.3)</h3>
+                                <ul className="space-y-1 text-sm">
+                                    {closePreconditions.map((c) => (
+                                        <li key={c.key} className="flex items-start gap-2">
+                                            <span className={c.passed ? 'font-bold text-green-700 dark:text-green-400' : 'font-bold text-red-600'}>
+                                                {c.passed ? '✓' : '✗'}
+                                            </span>
+                                            <span>
+                                                {c.label}
+                                                {c.detail && <span className="text-muted-foreground"> — {c.detail}</span>}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <form onSubmit={handleCloseJob} className="flex flex-wrap items-end gap-2 border-t pt-3">
+                                    <div className="min-w-64 flex-1">
+                                        <Label htmlFor="close_reason">Alasan penutupan (wajib, tercatat di audit trail)</Label>
+                                        <Input
+                                            id="close_reason"
+                                            value={closeForm.data.reason}
+                                            onChange={(e) => closeForm.setData('reason', e.target.value)}
+                                            placeholder="Contoh: semua kewajiban selesai, arsip lengkap"
+                                            required
+                                        />
+                                    </div>
+                                    <Button type="submit" disabled={closeForm.processing || closePreconditions.some((c) => !c.passed)}>
+                                        Tutup Job
+                                    </Button>
+                                </form>
+                            </>
+                        ) : null}
+                    </div>
+                )}
 
                 {/* Live Early Warning Demurrage & Detention Monitoring Card (§4.1–§4.4, Q9) */}
                 {demurrage && (

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Finance\InternalExchangeRateController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\FtaGateController;
+use App\Http\Controllers\JobCloseController;
 use App\Http\Controllers\JobController;
 use App\Http\Controllers\MilestoneController;
 use App\Http\Controllers\PibCalculatorController;
@@ -115,6 +116,10 @@ Route::middleware(['auth'])->group(function () {
     Route::get('jobs/{job}/documents/{document}/download', [JobController::class, 'downloadDocument'])->name('jobs.documents.download');
     Route::patch('jobs/{job}/problem-flag', [JobController::class, 'updateProblemFlag'])->name('jobs.problem-flag');
     Route::post('jobs/{job}/assign-field', [JobController::class, 'assignField'])->name('jobs.assign-field');
+
+    // Penutupan & pembukaan kembali Job (§2.3, Q11)
+    Route::post('jobs/{job}/close', [JobCloseController::class, 'close'])->name('jobs.close');
+    Route::post('jobs/{job}/reopen', [JobCloseController::class, 'reopen'])->name('jobs.reopen');
 
     // Milestone Dua Cabang (§2.2, §2.7, Tiket 07)
     Route::post('jobs/{job}/milestones', [MilestoneController::class, 'store'])->name('jobs.milestones.store');

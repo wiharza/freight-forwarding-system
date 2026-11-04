@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
+use App\Services\JobClose;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -63,6 +64,12 @@ class ContainerDeposit extends Model
         if ($this->forfeit_amount_usd <= 0) {
             return null;
         }
+
+        // KUNCI TUTUP (§2.3, Q11): deposit yang hangus tidak boleh lagi
+        // masuk ledger biaya Job tertutup. Belum ada endpoint HTTP untuk
+        // deposit di v1 — guard ini menjaga invarian di level model sampai
+        // UI deposit dibuat.
+        JobClose::assertNotClosed($this->job);
 
         return JobCost::query()->create([
             'company_id' => $this->company_id,

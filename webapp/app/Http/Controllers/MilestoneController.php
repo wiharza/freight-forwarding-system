@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Job;
 use App\Models\Milestone;
+use App\Services\JobClose;
 use App\Support\Audit;
 use App\Support\PrivateFile;
 use Carbon\Carbon;
@@ -21,6 +22,9 @@ class MilestoneController extends Controller
     public function store(Request $request, Job $job): RedirectResponse
     {
         Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): Job tertutup tidak menerima milestone baru.
+        JobClose::assertNotClosed($job);
 
         $types = [
             Milestone::TYPE_DISCHARGE,
@@ -118,6 +122,9 @@ class MilestoneController extends Controller
         Gate::authorize('verify_milestone');
         Gate::authorize('view', $milestone->job);
 
+        // KUNCI TUTUP (§2.3, Q11): verifikasi milestone adalah tulis.
+        JobClose::assertNotClosed($milestone->job);
+
         $milestone->verify($request->user(), $request->input('notes'));
 
         return redirect()->back();
@@ -127,6 +134,9 @@ class MilestoneController extends Controller
     {
         Gate::authorize('verify_milestone');
         Gate::authorize('view', $milestone->job);
+
+        // KUNCI TUTUP (§2.3, Q11): koreksi pengganti adalah tulis.
+        JobClose::assertNotClosed($milestone->job);
 
         $data = $request->validate([
             'reason' => ['required', 'string', 'min:5'],

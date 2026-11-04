@@ -56,6 +56,9 @@ class Job extends Model
         'fta_scheme',
         'problem_flag',
         'cached_status',
+        'closed_at',
+        'closed_by_user_id',
+        'close_reason',
         'referensi_excel_lama',
         'tanggal_cutover',
         'created_by_user_id',
@@ -68,6 +71,7 @@ class Job extends Model
             'eta' => 'date',
             'ata' => 'date',
             'tanggal_cutover' => 'date',
+            'closed_at' => 'datetime',
             'is_fcl' => 'boolean',
             'claim_fta' => 'boolean',
         ];
@@ -163,6 +167,29 @@ class Job extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    /**
+     * Penutup Job (§2.3, Q11) — siapa yang menutup, untuk banner & pesan kunci.
+     */
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by_user_id');
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Apakah Job sedang dalam keadaan tertutup (§2.3, Q11). Closed adalah
+     * keadaan di atas status turunan milestone: selama tertutup, status
+     * turunan tidak boleh menimpanya (lihat recomputeStatus()).
+     */
+    public function isClosed(): bool
+    {
+        return $this->closed_at !== null;
     }
 
     public function fields(): BelongsToMany
@@ -284,9 +311,16 @@ class Job extends Model
     /**
      * Hitung ulang status progres turunan (§2.3, Q11).
      * Urutan: Closed -> Lunas -> Ditagih -> Gate-In Empty -> Terkirim -> Gate-Out -> SPPB -> PIB Filed -> Dokumen Lengkap -> Draft.
+     *
+     * Closed mengunci status: Job yang tertutup TIDAK dihitung ulang dari
+     * milestone — penutupan hanya dibuka lewat reopen beralasan (§2.3).
      */
     public function recomputeStatus(): string
     {
+        if ($this->isClosed()) {
+            return $this->setAndReturnStatus(self::STATUS_CLOSED);
+        }
+
         // 1. Cek Gate-In Empty (level kontainer)
         $totalContainers = $this->containers()->count();
         if ($totalContainers > 0) {

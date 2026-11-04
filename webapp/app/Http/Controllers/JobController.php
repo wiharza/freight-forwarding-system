@@ -13,6 +13,7 @@ use App\Models\ShippingLine;
 use App\Models\User;
 use App\Models\Vessel;
 use App\Services\DemurrageCalculator;
+use App\Services\JobClose;
 use App\Support\Audit;
 use App\Support\FormatRules;
 use App\Support\PrivateFile;
@@ -209,6 +210,7 @@ class JobController extends Controller
             'milestones.verifier:id,name',
             'fields:id,name',
             'creator:id,name',
+            'closedBy:id,name',
         ]);
 
         $demurrageData = $calculator->calculateForJob($job);
@@ -223,12 +225,19 @@ class JobController extends Controller
             'fieldUsers' => $fieldUsers,
             'canAssignField' => $request->user()->can('job_assignment'),
             'canVerifyDoc' => $request->user()->can('verify_milestone'),
+            // Penutupan Job (§2.3, Q11): status tiap syarat close secara live.
+            'closePreconditions' => app(JobClose::class)->preconditions($job),
+            'canClose' => $request->user()->can('close_job'),
+            'canReopen' => $request->user()->can('reopen_close'),
         ]);
     }
 
     public function uploadDocument(Request $request, Job $job, JobDocument $document): RedirectResponse
     {
         Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): Job tertutup tidak menerima dokumen baru.
+        JobClose::assertNotClosed($job);
 
         // BUGFIX (otorisasi + integritas): dokumen harus milik job pada URL.
         // Tanpa ini, CS bisa mengunggah file ke folder Job A memakai ID dokumen
@@ -268,6 +277,9 @@ class JobController extends Controller
         // (sebelumnya hanya ability global — Field yang tidak ditugaskan ke
         // Job ini tetap bisa memverifikasi dokumennya).
         Gate::authorize('view', $job);
+
+        // KUNCI TUTUP (§2.3, Q11): verifikasi dokumen adalah tulis.
+        JobClose::assertNotClosed($job);
 
         // BUGFIX: cek kepemilikan yang sama seperti uploadDocument
         if ((int) $document->job_id !== (int) $job->id) {
