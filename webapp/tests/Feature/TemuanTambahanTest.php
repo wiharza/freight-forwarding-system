@@ -327,6 +327,58 @@ class TemuanTambahanTest extends TestCase
     }
 
     // ------------------------------------------------------------------
+    // Temuan #4 — kurs yang hilang tidak boleh diam-diam menjadi 1.0
+    // ------------------------------------------------------------------
+
+    #[Test]
+    public function kalkulator_gagal_bila_kurs_pajak_valas_tidak_ada(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        (new PibCalculator)->calculateItem([
+            'hs_code' => '8471302000',
+            'currency_code' => 'USD',
+            'fob_valas' => 10000,
+            'freight_valas' => 500,
+            'insurance_basis' => 'input_riil',
+            'insurance_valas' => 10,
+            // sengaja TANPA kurs_pajak_rate dan TANPA baris TaxExchangeRate
+        ]);
+    }
+
+    #[Test]
+    public function kalkulator_idr_tetap_berjalan_tanpa_kurs(): void
+    {
+        $res = (new PibCalculator)->calculateItem([
+            'hs_code' => '8471302000',
+            'currency_code' => 'IDR',
+            'fob_valas' => 10000000,
+            'freight_valas' => 500000,
+            'insurance_basis' => 'input_riil',
+            'insurance_valas' => 0,
+            // tanpa kurs_pajak_rate: IDR = 1.0 menurut definisi
+        ]);
+
+        $this->assertEqualsWithDelta(10500000, (float) $res['cif_rupiah'], 0.01);
+    }
+
+    #[Test]
+    public function kurs_internal_gagal_bila_tidak_ada_baris_sama_sekali(): void
+    {
+        $this->expectException(LogicException::class);
+
+        InternalExchangeRate::resolveRate('USD', Carbon::parse('2026-11-04'));
+    }
+
+    #[Test]
+    public function kurs_internal_idr_tetap_satu_tanpa_baris(): void
+    {
+        $info = InternalExchangeRate::resolveRate('IDR', Carbon::parse('2026-11-04'));
+
+        $this->assertSame('1.0000', $info['rate']);
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

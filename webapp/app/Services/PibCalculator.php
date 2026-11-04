@@ -9,6 +9,7 @@ use App\Models\Pph22Rule;
 use App\Models\TaxExchangeRate;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Validation\ValidationException;
 
 class PibCalculator
 {
@@ -69,10 +70,24 @@ class PibCalculator
         }
 
         // 2. Kurs Pajak Kemenkeu (NDPBM - Rabu s.d Selasa)
+        // TEMUAN #4 (2026-11-04): kurs yang hilang TIDAK BOLEH diam-diam
+        // menjadi 1.0 — untuk valas itu meruntuhkan CIF Rupiah (dan semua
+        // pungutan turunannya, mis. CIF USD 50.000 × 1,0 = Rp 50.000) tanpa
+        // jejak. IDR = 1.0 menurut definisi; valas tanpa baris Kurs Pajak
+        // untuk periode itu = gagal dengan pesan yang jelas.
         $kursPajakRate = (float) ($input['kurs_pajak_rate'] ?? 0);
         if ($kursPajakRate <= 0) {
-            $taxRate = TaxExchangeRate::resolveRate($currencyCode, $filingDate);
-            $kursPajakRate = $taxRate ? (float) $taxRate->rate_to_idr : 1.0;
+            if ($currencyCode === 'IDR') {
+                $kursPajakRate = 1.0;
+            } else {
+                $taxRate = TaxExchangeRate::resolveRate($currencyCode, $filingDate);
+                if (! $taxRate) {
+                    throw ValidationException::withMessages([
+                        'kurs_pajak_rate' => "Kurs Pajak {$currencyCode} tidak tersedia untuk tanggal {$filingDate->toDateString()} — isi Kurs Pajak (KMK) terlebih dahulu sebelum menghitung PIB.",
+                    ]);
+                }
+                $kursPajakRate = (float) $taxRate->rate_to_idr;
+            }
         }
 
         // 3. CIF Valas & CIF Rupiah (presisi penuh tanpa pembulatan prematur, Lampiran E)

@@ -85,11 +85,24 @@ class InternalExchangeRate extends Model
             ];
         }
 
-        return [
-            'rate' => '1.0000',
-            'is_official_today' => false,
-            'rate_date' => null,
-            'model' => null,
-        ];
+        // TEMUAN #4 (2026-11-04): tanpa baris kurs sama sekali, jangan
+        // diam-diam mengembalikan 1.0 — pemanggil (DemurrageCalculator)
+        // akan menghitung biaya IDR yang salah total tanpa jejak. IDR = 1.0
+        // menurut definisi dan tidak butuh baris kurs; valas tanpa baris
+        // kurs sama sekali = gagal dengan pesan yang jelas. (Fallback ke
+        // kurs terakhir sebelumnya di atas tetap berlaku — ini hanya
+        // terpicu bila TIDAK ADA baris kurs untuk mata uang itu.)
+        if (strtoupper($currencyCode) === 'IDR') {
+            return [
+                'rate' => '1.0000',
+                'is_official_today' => true,
+                'rate_date' => $date,
+                'model' => null,
+            ];
+        }
+
+        throw new LogicException(
+            "Kurs Internal {$currencyCode} belum diatur untuk tanggal {$date} (tidak ada baris kurs sama sekali) — isi Kurs Internal terlebih dahulu."
+        );
     }
 }
