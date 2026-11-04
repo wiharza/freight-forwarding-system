@@ -4,7 +4,7 @@
 
 **Blocked by:** 06, 09.
 
-**Status:** ready-for-agent
+**Status:** resolved — 2026-11-04, branch `fitur-fta-gate` (dari `perbaiki-temuan-tambahan` bbe05d9; PR ini harus merge SETELAH PR temuan). Gerbang FTA: Form FTA + validasi prefix 6 digit + origin/port + masa berlaku, override Customs Specialist (alasan + lampiran, maker-checker), decision log MFN (mfn_now/delay, hitung ulang MFN + kunci klaim), referensi refund eksternal. T5 (digit 7–8 berbeda) = peringatan non-blokir, tercatat di decision log. Tes: FtaGateTest 15 passed; suite 192 passed / 716 assertions.
 
 Sumber: §3.8, Q19.
 

@@ -3,9 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomsDeclaration;
+use App\Models\FtaDecision;
+use App\Models\FtaForm;
+use App\Models\FtaGateOverride;
 use App\Models\FtaTariff;
 use App\Models\Job;
 use App\Models\TaxExchangeRate;
+use App\Services\FtaGate;
 use App\Services\PibCalculator;
 use App\Support\Audit;
 use App\Support\FormatRules;
@@ -32,19 +36,54 @@ class PibCalculatorController extends Controller
 
         $activeTaxRate = TaxExchangeRate::resolveRate('USD', now());
 
+        // Gerbang FTA (Tiket 10, Q19): evaluasi murni untuk deklarasi
+        // terbaru — status lolos/peringatan/diblokir/MFN per seri.
+        $ftaGate = $declaration ? app(FtaGate::class)->evaluate($job, $declaration) : null;
+
         return Inertia::render('calculator/pib', [
-            'job' => $job->load(['importir', 'shippingLine']),
+            'job' => $job->load(['importir', 'shippingLine', 'pol', 'pod']),
             'declaration' => $declaration,
             'activeTaxRate' => $activeTaxRate,
             'ftaSchemes' => array_keys(FtaTariff::SCHEMES),
             'canCalculate' => auth()->user()->can('calculator_pib') || auth()->user()->hasRole('admin'),
             'canApprove' => auth()->user()->can('approve_snapshot') || auth()->user()->hasRole('admin'),
+            'ftaForms' => FtaForm::query()
+                ->where('job_id', $job->id)
+                ->with('creator:id,name')
+                ->latest()
+                ->get(),
+            'ftaGate' => $ftaGate,
+            'ftaDecisions' => FtaDecision::query()
+                ->where('job_id', $job->id)
+                ->with('creator:id,name')
+                ->latest()
+                ->take(20)
+                ->get(),
+            'ftaOverrides' => FtaGateOverride::query()
+                ->whereHas('declaration', fn ($q) => $q->where('job_id', $job->id))
+                ->with('creator:id,name')
+                ->latest()
+                ->take(20)
+                ->get(),
+            'canOverride' => auth()->user()->can('override_fta'),
+            'canDecide' => auth()->user()->can('calculator_pib'),
+            'canStoreForm' => auth()->user()->can('fta_form'),
         ]);
     }
 
     public function storeDraft(Request $request, Job $job, PibCalculator $calculator): RedirectResponse
     {
         Gate::authorize('calculator_pib');
+
+        // Gerbang FTA (Q19): Job yang sudah diputuskan "file MFN now"
+        // tidak boleh diam-diam dihitung lagi dengan klaim FTA pada versi
+        // PIB yang sama — klaim ulang MFN→FTA adalah refund manual di luar
+        // sistem. Keputusan MFN tercatat di decision log (siapa/kapan/alasan).
+        if ($job->claim_fta && FtaGate::hasMfnDecision($job)) {
+            throw ValidationException::withMessages([
+                'claim_fta' => 'Job ini sudah diputuskan file MFN (keputusan tercatat di decision log) — draf tidak dapat dihitung lagi dengan klaim FTA. Klaim ulang MFN→FTA adalah proses refund manual di luar sistem.',
+            ]);
+        }
 
         $data = $request->validate([
             'incoterm' => FormatRules::incotermRules(), // DQ-21 (data keterangan, tidak mengubah DPP — Q28)
@@ -142,6 +181,16 @@ class PibCalculatorController extends Controller
                 'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} memakai tarif master berstatus Perlu Verifikasi (ADR 0008). Verifikasi tarifnya terlebih dahulu.",
             ]);
         }
+
+        // Gerbang FTA (Tiket 10, Q19): filing diblokir bila ada seri
+        // bertarif FTA tanpa Form yang cocok/berlaku — kecuali sudah
+        // di-override oleh Customs Specialist lain (alasan + lampiran).
+        // Peringatan T5 (digit 7–8 berbeda) tidak memblokir, tetapi
+        // dicatat ke decision log sebelum approve sukses.
+        $ftaGate = app(FtaGate::class);
+        $evaluation = $ftaGate->evaluate($job, $declaration);
+        $ftaGate->assertApprovable($job, $declaration);
+        $ftaGate->recordProceedingWarnings($job, $declaration, $evaluation);
 
         $declaration->update([
             'status' => CustomsDeclaration::STATUS_APPROVED,
