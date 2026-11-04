@@ -42,8 +42,10 @@ class InvoiceController extends Controller
     {
         Gate::authorize('invoice');
 
-        $job->load(['importir', 'shippingLine', 'costs' => fn ($q) => $q->where('is_billable', true)]);
-        $job->load(['costs' => fn ($q) => $q->where('payer_flag', '!=', 'importir_langsung')]);
+        // BUGFIX: kolom `is_billable` tidak ada di skema job_costs — query ini
+        // menggagalkan halaman di PostgreSQL. Kelayakan tagih dihitung dari
+        // payer_flag (lihat JobCost::isBillable()).
+        $job->load(['importir', 'shippingLine', 'costs' => fn ($q) => $q->where('payer_flag', '!=', JobCost::PAYER_IMPORTIR)]);
 
         return Inertia::render('finance/invoice-create', [
             'job' => $job,
@@ -89,7 +91,9 @@ class InvoiceController extends Controller
             ->where('status', 'aktual')
             ->get();
 
-        $blokBTotal = 0.0;
+        // BUGFIX: Blok (b) sebelumnya hardcoded 0 sehingga biaya billable tidak
+        // pernah masuk total invoice walau itemnya dibuat.
+        $blokBTotal = (float) $billableCosts->sum('amount_idr');
         $blokBPPN = 0.0;
 
         // Blok (c) — Jasa PPJK + PPN 12% × DPP 11/12
@@ -252,15 +256,26 @@ class InvoiceController extends Controller
 
         $invoice = Invoice::query()->findOrFail($data['invoice_id']);
 
+        // BUGFIX: hitung alokasi yang SUDAH tercatat sebelumnya untuk pembayaran ini
+        // agar alokasi bertahap (batch terpisah) tidak bisa melampaui nominal payment.
+        $previouslyAllocated = (float) $payment->allocations()->sum('amount');
+        $sisaPayment = (float) $payment->amount - $previouslyAllocated;
+
         DB::beginTransaction();
         try {
-            $totalAllocated = 0;
+            $totalAllocatedThisRequest = 0;
 
             foreach ($data['allocations'] as $alloc) {
                 // Batas: alokasi per baris tidak boleh melebihi sisa tagihan baris
                 if (isset($alloc['invoice_item_id'])) {
                     $item = InvoiceItem::query()->findOrFail($alloc['invoice_item_id']);
-                    $sisaBaris = (float) $item->total_line - $item->allocations()->sum('amount');
+                    // Pastikan item milik invoice yang dituju
+                    if ((int) $item->invoice_id !== (int) $invoice->id) {
+                        throw ValidationException::withMessages([
+                            'allocations' => "Item invoice tidak cocok dengan invoice yang dipilih.",
+                        ]);
+                    }
+                    $sisaBaris = (float) $item->total_line - (float) $item->allocations()->sum('amount');
                     if ($alloc['amount'] > $sisaBaris) {
                         throw ValidationException::withMessages([
                             'allocations' => "Alokasi melebihi sisa tagihan baris: {$item->description}",
@@ -280,19 +295,24 @@ class InvoiceController extends Controller
                     'allocated_by_user_id' => $request->user()->id,
                 ]);
 
-                $totalAllocated += $alloc['amount'];
+                $totalAllocatedThisRequest += $alloc['amount'];
             }
 
-            // Batas: total alokasi tidak boleh melebihi jumlah pembayaran
-            if ($totalAllocated > (float) $payment->amount) {
+            // Batas: total alokasi KUMULATIF tidak boleh melebihi jumlah pembayaran
+            if ($totalAllocatedThisRequest > $sisaPayment) {
                 throw ValidationException::withMessages([
-                    'allocations' => 'Total alokasi melebihi jumlah pembayaran.',
+                    'allocations' => "Total alokasi melebihi sisa dana pembayaran (tersisa Rp " . number_format($sisaPayment, 0, ',', '.') . ").",
                 ]);
             }
 
             // Update invoice total_paid
-            $invoice->total_paid = (float) $invoice->total_paid + $totalAllocated;
+            $invoice->total_paid = (float) $invoice->total_paid + $totalAllocatedThisRequest;
             $invoice->save();
+
+            // Tandai payment sudah teralokasi penuh jika sisa habis
+            if (($previouslyAllocated + $totalAllocatedThisRequest) >= (float) $payment->amount) {
+                $payment->update(['is_unallocated' => false]);
+            }
 
             // Cek lunas
             if ($invoice->sisaTagihan() <= 0) {
@@ -301,7 +321,7 @@ class InvoiceController extends Controller
 
             Audit::record('payment.allocated', $payment, [
                 'invoice_id' => $invoice->id,
-                'total_allocated' => $totalAllocated,
+                'total_allocated' => $totalAllocatedThisRequest,
             ], 'Alokasi pembayaran ke baris invoice');
 
             DB::commit();

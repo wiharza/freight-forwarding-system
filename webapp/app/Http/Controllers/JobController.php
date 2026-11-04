@@ -223,6 +223,13 @@ class JobController extends Controller
     {
         Gate::authorize('view', $job);
 
+        // BUGFIX (otorisasi + integritas): dokumen harus milik job pada URL.
+        // Tanpa ini, CS bisa mengunggah file ke folder Job A memakai ID dokumen
+        // milik Job B — dokumen Job B tertimpa metadata-nya.
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
+
         $request->validate([
             'file' => ['required', 'file', 'max:20480'], // max 20MB
             'metadata' => ['nullable', 'array'],
@@ -247,6 +254,11 @@ class JobController extends Controller
     public function verifyDocument(Request $request, Job $job, JobDocument $document): RedirectResponse
     {
         Gate::authorize('verify_milestone');
+
+        // BUGFIX: cek kepemilikan yang sama seperti uploadDocument
+        if ((int) $document->job_id !== (int) $job->id) {
+            abort(404, 'Dokumen tidak ditemukan pada Job ini.');
+        }
 
         $notes = $request->input('notes');
         $document->markVerified($request->user(), $notes);
