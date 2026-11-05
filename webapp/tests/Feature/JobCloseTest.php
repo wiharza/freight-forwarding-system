@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -140,9 +141,17 @@ class JobCloseTest extends TestCase
             'created_by_user_id' => $this->ops->id,
         ]);
 
-        // (c) arsip seluruh fase terverifikasi
+        // (c) arsip seluruh fase terverifikasi — sejak temuan audit 8 item
+        // (item 6), verifikasi mensyaratkan file bukti: tiap dokumen
+        // diberi file dummy dulu sebelum diverifikasi.
+        Storage::fake('local');
         foreach ($this->job->documents as $doc) {
             if ($doc->status !== JobDocument::STATUS_TIDAK_BERLAKU) {
+                Storage::disk('local')->put("documents/close-{$doc->id}.pdf", 'dummy');
+                $doc->update([
+                    'file_path' => "documents/close-{$doc->id}.pdf",
+                    'status' => JobDocument::STATUS_DIUPLOAD,
+                ]);
                 $doc->markVerified($this->ops);
             }
         }
