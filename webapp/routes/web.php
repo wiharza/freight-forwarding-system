@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\LegalTariffController;
 use App\Http\Controllers\Admin\LineTariffController;
 use App\Http\Controllers\Admin\MasterDataController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Finance\InternalExchangeRateController;
 use App\Http\Controllers\Finance\InvoiceController;
 use App\Http\Controllers\FtaGateController;
@@ -24,9 +25,7 @@ Route::get('/', function () {
 })->name('home');
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Kotak masuk notifikasi (§2.6, Q8, Tiket 15)
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
@@ -120,6 +119,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('jobs/{job}/documents/{document}/upload', [JobController::class, 'uploadDocument'])->name('jobs.documents.upload');
     Route::post('jobs/{job}/documents/{document}/verify', [JobController::class, 'verifyDocument'])->name('jobs.documents.verify');
     Route::post('jobs/{job}/documents/{document}/unverify', [JobController::class, 'unverifyDocument'])->name('jobs.documents.unverify');
+    Route::post('jobs/{job}/documents/{document}/metadata', [JobController::class, 'updateDocumentMetadata'])->name('jobs.documents.metadata');
     Route::get('jobs/{job}/documents/{document}/download', [JobController::class, 'downloadDocument'])->name('jobs.documents.download');
     Route::get('jobs/{job}/documents/{document}/preview', [JobController::class, 'previewDocument'])->name('jobs.documents.preview');
     Route::patch('jobs/{job}/problem-flag', [JobController::class, 'updateProblemFlag'])->name('jobs.problem-flag');

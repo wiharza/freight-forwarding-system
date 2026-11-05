@@ -29,6 +29,9 @@ type DocumentItem = {
     verifier: { id: number; name: string } | null;
     verified_at: string | null;
     notes: string | null;
+    metadata: Record<string, string | number | null> | null;
+    metadata_summary: string | null;
+    metadata_prefill: Record<string, string | number | null>;
 };
 
 type MilestoneItem = {
@@ -151,6 +154,8 @@ export default function JobsShow({
     const isAdmin = ((usePage<SharedData>().props.roles as string[] | undefined) ?? []).includes('admin');
     const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
     const [docFile, setDocFile] = useState<File | null>(null);
+    const [docMeta, setDocMeta] = useState<Record<string, string>>({});
+    const [editingDocId, setEditingDocId] = useState<number | null>(null);
     const [showMilestoneModal, setShowMilestoneModal] = useState(false);
 
     const breadcrumbs: BreadcrumbItem[] = [
@@ -211,17 +216,88 @@ export default function JobsShow({
         reopenForm.post(route('jobs.reopen', job.id));
     };
 
+    const openUploadDoc = (d: DocumentItem) => {
+        // Isian diisi awal dari data Job / Form FTA yang sudah ada
+        // (prefill server), supaya tidak entri ganda.
+        setDocMeta(metaToFormValues(d.metadata_prefill));
+        setEditingDocId(null);
+        setSelectedDocId(d.id);
+    };
+
+    const openEditDocMeta = (d: DocumentItem) => {
+        setDocMeta(metaToFormValues(d.metadata ?? d.metadata_prefill));
+        setSelectedDocId(null);
+        setEditingDocId(d.id);
+    };
+
+    const renderMetaFields = () => {
+        const doc = job.documents.find((x) => x.id === (selectedDocId ?? editingDocId));
+        const fields = doc ? (DOC_METADATA_FIELDS[doc.document_type] ?? []) : [];
+        return fields.map((field) => (
+            <div key={field.key} className="flex flex-col gap-1">
+                <Label htmlFor={`doc-meta-${field.key}`} className="text-xs whitespace-nowrap">
+                    {field.label}
+                </Label>
+                {field.type === 'select' ? (
+                    <select
+                        id={`doc-meta-${field.key}`}
+                        className="h-8 w-28 rounded-md border text-xs"
+                        value={docMeta[field.key] ?? (field.key === 'mata_uang' ? 'IDR' : '')}
+                        onChange={(e) => setDocMeta((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    >
+                        {(field.options ?? []).map((opt) => (
+                            <option key={opt} value={opt}>
+                                {opt}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <Input
+                        id={`doc-meta-${field.key}`}
+                        type={field.type === 'integer' ? 'number' : field.type}
+                        step={field.type === 'number' ? 'any' : undefined}
+                        min={field.type === 'number' || field.type === 'integer' ? 0 : undefined}
+                        className="h-8 w-36 text-xs"
+                        value={docMeta[field.key] ?? ''}
+                        onChange={(e) => setDocMeta((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                    />
+                )}
+            </div>
+        ));
+    };
+
     const handleUploadDoc = (documentId: number) => {
         if (!docFile) return;
         const formData = new FormData();
         formData.append('file', docFile);
+        Object.entries(docMeta).forEach(([key, value]) => {
+            if (value !== '') formData.append(`metadata[${key}]`, value);
+        });
 
         router.post(route('jobs.documents.upload', { job: job.id, document: documentId }), formData, {
             onSuccess: () => {
                 setSelectedDocId(null);
                 setDocFile(null);
+                setDocMeta({});
             },
         });
+    };
+
+    const handleUpdateDocMeta = (documentId: number) => {
+        const metadata: Record<string, string> = {};
+        Object.entries(docMeta).forEach(([key, value]) => {
+            if (value !== '') metadata[key] = value;
+        });
+        router.post(
+            route('jobs.documents.metadata', { job: job.id, document: documentId }),
+            { metadata },
+            {
+                onSuccess: () => {
+                    setEditingDocId(null);
+                    setDocMeta({});
+                },
+            },
+        );
     };
 
     const handleVerifyDoc = (documentId: number) => {
@@ -304,6 +380,66 @@ export default function JobsShow({
         tidak_berlaku: 'Tidak berlaku',
     };
 
+    // Skema isian data terstruktur per jenis dokumen — CERMIN dari
+    // App\Support\DocumentMetadata::SCHEMAS di server (sumber kebenaran
+    // validasi). Ubah di kedua tempat bila menambah jenis/isian.
+    const DOC_METADATA_FIELDS: Record<
+        string,
+        { key: string; label: string; type: 'text' | 'date' | 'number' | 'integer' | 'select'; options?: string[] }[]
+    > = {
+        invoice: [
+            { key: 'nomor_invoice', label: 'No. Invoice', type: 'text' },
+            { key: 'tanggal_invoice', label: 'Tgl. Invoice', type: 'date' },
+            { key: 'nilai', label: 'Nilai', type: 'number' },
+            { key: 'mata_uang', label: 'Mata Uang', type: 'select', options: ['IDR', 'USD'] },
+        ],
+        packing_list: [
+            { key: 'jumlah_koli', label: 'Jumlah Koli', type: 'integer' },
+            { key: 'berat_kotor_kg', label: 'Berat Kotor (kg)', type: 'number' },
+            { key: 'volume_m3', label: 'Volume (m³)', type: 'number' },
+        ],
+        bl: [
+            { key: 'nomor_bl', label: 'No. B/L', type: 'text' },
+            { key: 'tanggal_bl', label: 'Tgl. B/L', type: 'date' },
+        ],
+        form_fta: [
+            { key: 'nomor_form', label: 'No. Form', type: 'text' },
+            { key: 'skema', label: 'Skema', type: 'text' },
+            { key: 'negara_asal', label: 'Negara Asal', type: 'text' },
+            { key: 'tanggal_terbit', label: 'Tgl. Terbit', type: 'date' },
+            { key: 'tanggal_berlaku', label: 'Tgl. Berlaku', type: 'date' },
+        ],
+        do: [
+            { key: 'nomor_do', label: 'No. DO', type: 'text' },
+            { key: 'tanggal_terbit', label: 'Tgl. Terbit', type: 'date' },
+        ],
+        sppb: [
+            { key: 'nomor_sppb', label: 'No. SPPB', type: 'text' },
+            { key: 'tanggal_sppb', label: 'Tgl. SPPB', type: 'date' },
+        ],
+        gate_out_proof: [
+            { key: 'tanggal', label: 'Tanggal', type: 'date' },
+            { key: 'keterangan', label: 'Keterangan', type: 'text' },
+        ],
+        gate_in_proof: [
+            { key: 'tanggal', label: 'Tanggal', type: 'date' },
+            { key: 'keterangan', label: 'Keterangan', type: 'text' },
+        ],
+        pod: [
+            { key: 'tanggal_terima', label: 'Tgl. Terima', type: 'date' },
+            { key: 'penerima', label: 'Penerima', type: 'text' },
+        ],
+    };
+
+    // Isian form selalu string; nilai null dibuang (dianggap tidak diisi).
+    const metaToFormValues = (meta: Record<string, string | number | null> | null): Record<string, string> => {
+        const out: Record<string, string> = {};
+        Object.entries(meta ?? {}).forEach(([key, value]) => {
+            if (value !== null && value !== '') out[key] = String(value);
+        });
+        return out;
+    };
+
     const renderDocRow = (d: DocumentItem) => (
         <tr key={d.id} className="border-b last:border-b-0">
             <td className="px-3 py-2 font-medium capitalize">{d.document_type.replace(/_/g, ' ')}</td>
@@ -330,56 +466,107 @@ export default function JobsShow({
                 ) : (
                     <span className="text-muted-foreground">-</span>
                 )}
+                {d.metadata_summary && (
+                    <span className="text-muted-foreground mt-1 block" title={d.metadata_summary}>
+                        {d.metadata_summary}
+                    </span>
+                )}
             </td>
             <td className="text-muted-foreground px-3 py-2 text-xs whitespace-nowrap">{d.verifier?.name ? `Oleh: ${d.verifier.name}` : '-'}</td>
-            <td className="flex items-center gap-1.5 px-3 py-2 whitespace-nowrap">
-                {d.file_path && (
-                    <>
-                        <Button size="sm" variant="outline" asChild>
-                            <a href={route('jobs.documents.download', { job: job.id, document: d.id })}>
-                                <Download className="mr-1 size-3" /> Unduh
-                            </a>
+            <td className="flex flex-wrap items-center gap-1.5 px-3 py-2 whitespace-nowrap">
+                {editingDocId === d.id ? (
+                    <div className="flex flex-wrap items-end gap-2">
+                        {renderMetaFields()}
+                        <Button size="sm" onClick={() => handleUpdateDocMeta(d.id)}>
+                            Simpan Data
                         </Button>
-                        {isPreviewableFile(d.file_name) && (
-                            <Button size="sm" variant="outline" asChild>
-                                <a
-                                    href={route('jobs.documents.preview', { job: job.id, document: d.id })}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    title="Pratinjau di tab baru (PDF/gambar)"
-                                >
-                                    <Eye className="mr-1 size-3" /> Lihat
-                                </a>
-                            </Button>
-                        )}
-                    </>
-                )}
-                {d.status !== 'diverifikasi' && d.status !== 'tidak_berlaku' && (
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                                setEditingDocId(null);
+                                setDocMeta({});
+                            }}
+                        >
+                            Batal
+                        </Button>
+                    </div>
+                ) : (
                     <>
-                        {selectedDocId === d.id ? (
-                            <div className="flex items-center gap-2">
-                                <input type="file" className="max-w-xs text-xs" onChange={(e) => setDocFile(e.target.files?.[0] || null)} />
-                                <Button size="sm" onClick={() => handleUploadDoc(d.id)} disabled={!docFile}>
-                                    Upload
+                        {d.file_path && (
+                            <>
+                                <Button size="sm" variant="outline" asChild>
+                                    <a href={route('jobs.documents.download', { job: job.id, document: d.id })}>
+                                        <Download className="mr-1 size-3" /> Unduh
+                                    </a>
                                 </Button>
-                                <Button size="sm" variant="ghost" onClick={() => setSelectedDocId(null)}>
-                                    Batal
-                                </Button>
-                            </div>
-                        ) : (
-                            <Button size="sm" variant="outline" onClick={() => setSelectedDocId(d.id)}>
-                                <Upload className="mr-1 size-3" /> Unggah
-                            </Button>
+                                {isPreviewableFile(d.file_name) && (
+                                    <Button size="sm" variant="outline" asChild>
+                                        <a
+                                            href={route('jobs.documents.preview', { job: job.id, document: d.id })}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            title="Pratinjau di tab baru (PDF/gambar)"
+                                        >
+                                            <Eye className="mr-1 size-3" /> Lihat
+                                        </a>
+                                    </Button>
+                                )}
+                            </>
                         )}
+                        {d.status !== 'diverifikasi' && d.status !== 'tidak_berlaku' && (
+                            <>
+                                {selectedDocId === d.id ? (
+                                    <div className="flex flex-wrap items-end gap-2">
+                                        <div className="flex flex-col gap-1">
+                                            <Label className="text-xs whitespace-nowrap">File</Label>
+                                            <input
+                                                type="file"
+                                                className="max-w-xs text-xs"
+                                                onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                                            />
+                                        </div>
+                                        {renderMetaFields()}
+                                        <Button size="sm" onClick={() => handleUploadDoc(d.id)} disabled={!docFile}>
+                                            Upload
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                setSelectedDocId(null);
+                                                setDocMeta({});
+                                            }}
+                                        >
+                                            Batal
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <Button size="sm" variant="outline" onClick={() => openUploadDoc(d)}>
+                                        <Upload className="mr-1 size-3" /> Unggah
+                                    </Button>
+                                )}
 
-                        {d.status === 'diupload' && canVerifyDoc && (
-                            <Button size="sm" variant="default" onClick={() => handleVerifyDoc(d.id)}>
-                                <CheckCircle2 className="mr-1 size-3" /> Verifikasi
-                            </Button>
+                                {d.status === 'diupload' && canVerifyDoc && (
+                                    <Button size="sm" variant="default" onClick={() => handleVerifyDoc(d.id)}>
+                                        <CheckCircle2 className="mr-1 size-3" /> Verifikasi
+                                    </Button>
+                                )}
+                                {d.status === 'diupload' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => openEditDocMeta(d)}
+                                        title="Ubah isian data dokumen tanpa mengunggah ulang file"
+                                    >
+                                        <Edit2 className="mr-1 size-3" /> Edit Data
+                                    </Button>
+                                )}
+                            </>
                         )}
                     </>
                 )}
-                {d.status === 'diverifikasi' && canUnverifyDoc && (
+                {d.status === 'diverifikasi' && canUnverifyDoc && editingDocId !== d.id && (
                     <Button
                         size="sm"
                         variant="outline"
