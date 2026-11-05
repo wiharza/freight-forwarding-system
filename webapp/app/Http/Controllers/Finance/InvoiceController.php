@@ -446,6 +446,19 @@ class InvoiceController extends Controller
                 $totalAllocatedThisRequest += $alloc['amount'];
             }
 
+            // TEMUAN AUDIT 8 ITEM (2026-11-05, item 5): total alokasi juga
+            // dibatasi SISA TAGIHAN invoice — bukan hanya sisa pembayaran.
+            // Tanpa invoice_item_id, cek per-baris di atas dilewati sehingga
+            // alokasi bisa melampaui total invoice selama masih dalam
+            // nominal payment (total_paid > total_invoice). Baris invoice
+            // sudah terkunci, jadi sisaTagihan() di sini adalah saldo
+            // sebelum request ini — batas yang benar untuk batch ini.
+            if ($totalAllocatedThisRequest > (float) $invoice->sisaTagihan()) {
+                throw ValidationException::withMessages([
+                    'allocations' => 'Total alokasi melebihi sisa tagihan invoice (tersisa Rp '.number_format($invoice->sisaTagihan(), 0, ',', '.').').',
+                ]);
+            }
+
             // Batas: total alokasi KUMULATIF tidak boleh melebihi jumlah pembayaran
             if ($totalAllocatedThisRequest > $sisaPayment) {
                 throw ValidationException::withMessages([
