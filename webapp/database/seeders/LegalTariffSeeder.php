@@ -13,7 +13,10 @@ class LegalTariffSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyId = app(CompanyContext::class)->id();
+        // TEMUAN LANJUTAN (2026-11-05): sama seperti MasterDataSeeder —
+        // seeder standalone wajib tenant eksplisit, jangan pernah jatuh
+        // ke company ber-ID terendah.
+        $companyId = app(CompanyContext::class)->requireExplicitId('LegalTariffSeeder');
 
         // 1. Seed Mapping PPh 22 dari file seed-pph22-lampiran.csv (215 baris resmi PMK 51/2025)
         $csvPath = database_path('data/seed-pph22-lampiran.csv');
