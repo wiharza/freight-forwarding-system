@@ -14,6 +14,7 @@ use App\Models\MfnTariff;
 use App\Models\Payment;
 use App\Models\Pph22Rule;
 use App\Models\ShippingLine;
+use App\Models\TaxExchangeRate;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vendor;
@@ -385,6 +386,17 @@ class TemuanTambahanTest extends TestCase
     #[Test]
     public function emas_batangan_dikenai_pph22_0_25_persen(): void
     {
+        TaxExchangeRate::query()->firstOrCreate(
+            ['kmk_number' => 'KMK-TEST-16000'],
+            [
+                'valid_from' => '2026-01-01',
+                'valid_to' => '2026-12-31',
+                'currency_code' => 'USD',
+                'rate_to_idr' => '16000',
+                'source' => 'test',
+            ]
+        );
+
         Pph22Rule::create([
             'company_id' => $this->company->id,
             'hs_code' => '71.08',
@@ -495,6 +507,20 @@ class TemuanTambahanTest extends TestCase
 
     private function buatDrafPib(Job $job, string $hsCode): CustomsDeclaration
     {
+        // TEMUAN LANJUTAN (2026-11-05): kalkulator selalu resolve Kurs Pajak
+        // dari baris resmi — draf butuh baris USD 16000 (di-seed di sini,
+        // bukan setUp, supaya test "kurs hilang gagal" tetap tanpa baris).
+        TaxExchangeRate::query()->firstOrCreate(
+            ['kmk_number' => 'KMK-TEST-16000'],
+            [
+                'valid_from' => '2026-01-01',
+                'valid_to' => '2026-12-31',
+                'currency_code' => 'USD',
+                'rate_to_idr' => '16000',
+                'source' => 'test',
+            ]
+        );
+
         $this->actingAs($this->customs)->post(route('jobs.calculator.draft', $job->id), [
             'incoterm' => 'FOB',
             'items' => [[

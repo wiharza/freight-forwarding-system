@@ -14,6 +14,7 @@ use App\Models\Milestone;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\ShippingLine;
+use App\Models\TaxExchangeRate;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vendor;
@@ -101,6 +102,17 @@ class WorkflowBugfixTest extends TestCase
         ]);
 
         $this->job->assignField($this->field, $this->ops);
+
+        // TEMUAN LANJUTAN (2026-11-05): kalkulator selalu resolve Kurs Pajak
+        // dari baris resmi — test BM di file ini butuh baris USD 16000.
+        TaxExchangeRate::query()->create([
+            'kmk_number' => 'KMK-TEST-16000',
+            'valid_from' => '2026-01-01',
+            'valid_to' => '2026-12-31',
+            'currency_code' => 'USD',
+            'rate_to_idr' => '16000',
+            'source' => 'test',
+        ]);
     }
 
     // ------------------------------------------------------------------

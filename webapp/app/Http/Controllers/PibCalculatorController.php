@@ -95,7 +95,11 @@ class PibCalculatorController extends Controller
             'items.*.freight_valas' => ['required', 'numeric', 'min:0'],
             'items.*.insurance_valas' => ['nullable', 'numeric', 'min:0'],
             'items.*.insurance_basis' => ['required', 'string'],
-            'items.*.kurs_pajak_rate' => ['required', 'numeric', 'min:0'],
+            // TEMUAN LANJUTAN (2026-11-05): kurs TIDAK lagi input wajib —
+            // kalkulator selalu resolve dari baris Kurs Pajak resmi dan
+            // gagal tertutup bila tidak ada; nilai klien diabaikan untuk
+            // valas. IDR tetap 1.0 menurut definisi.
+            'items.*.kurs_pajak_rate' => ['nullable', 'numeric', 'min:0'],
             'items.*.is_ppn_luxury' => ['boolean'],
             'items.*.is_pph22_exempt' => ['boolean'],
             'items.*.exemption_reason' => ['nullable', 'string'],

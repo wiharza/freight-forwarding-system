@@ -76,6 +76,17 @@ class DataQualityTest extends TestCase
         }
 
         app(CompanyContext::class)->set($this->company->id);
+
+        // TEMUAN LANJUTAN (2026-11-05): kalkulator selalu resolve Kurs Pajak
+        // dari baris resmi — draf-draf di file ini butuh baris USD 15800.
+        TaxExchangeRate::query()->create([
+            'kmk_number' => 'KMK-TEST-15800',
+            'valid_from' => '2026-01-01',
+            'valid_to' => '2026-12-31',
+            'currency_code' => 'USD',
+            'rate_to_idr' => '15800',
+            'source' => 'test',
+        ]);
     }
 
     private function jobPayload(array $overrides = []): array
