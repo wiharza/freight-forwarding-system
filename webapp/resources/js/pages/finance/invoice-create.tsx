@@ -27,11 +27,23 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Buat Baru', href: '#' },
 ];
 
-export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; billableCosts: CostRow[] }) {
+export default function InvoiceCreate({
+    job,
+    billableCosts,
+    alreadyBilledA,
+    alreadyBilledC,
+}: {
+    job: JobLite;
+    billableCosts: CostRow[];
+    alreadyBilledA?: { invoice_number: string } | null;
+    alreadyBilledC?: { invoice_number: string } | null;
+}) {
     const { data, setData, post, processing, errors } = useForm({
         invoice_date: new Date().toISOString().split('T')[0],
         due_date: '',
-        blok_c_service_fee: '',
+        // TEMUAN LANJUTAN (2026-11-05): jasa sudah ditagih → invoice susulan
+        // wajib 0 (server menolak bila diisi).
+        blok_c_service_fee: alreadyBilledC ? '0' : '',
         blok_c_ppn_rate: '0.12',
         faktur_pajak_number: '',
         notes: '',
@@ -65,6 +77,11 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
                             Tidak bisa diedit di sini — sumbernya Snapshot SPT PIB, bukan Kalkulator (ADR 0004). Jika masih 0, pastikan draf PIB sudah
                             di-approve di halaman Kalkulator.
                         </p>
+                        {alreadyBilledA && (
+                            <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">
+                                Blok (a) sudah ditagih pada {alreadyBilledA.invoice_number} — invoice ini tidak akan menagih pungutan lagi.
+                            </p>
+                        )}
                     </div>
 
                     {/* Blok (b) — biaya pihak ketiga */}
@@ -89,6 +106,11 @@ export default function InvoiceCreate({ job, billableCosts }: { job: JobLite; bi
                     {/* Blok (c) — jasa PPJK */}
                     <div className="bg-card space-y-4 rounded-xl border p-4">
                         <h3 className="border-b pb-2 text-sm font-medium">Blok (c) — Jasa PPJK + PPN</h3>
+                        {alreadyBilledC && (
+                            <p className="rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-800">
+                                Jasa PPJK sudah ditagih pada {alreadyBilledC.invoice_number} — isi Service Fee 0 untuk invoice susulan.
+                            </p>
+                        )}
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div>
                                 <Label htmlFor="blok_c_service_fee">Service Fee (Rp)</Label>

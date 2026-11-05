@@ -53,9 +53,26 @@ class InvoiceController extends Controller
         // angka yang akhirnya ditagihkan.
         $job->load(['importir', 'shippingLine']);
 
+        // TEMUAN LANJUTAN (2026-11-05): beri tahu Finance bila Blok A / jasa
+        // sudah ditagih — invoice susulan hanya menagih yang belum ditagih.
+        $alreadyBilledA = Invoice::query()
+            ->where('job_id', $job->id)
+            ->where('status', '!=', Invoice::STATUS_CANCELLED)
+            ->where('blok_a_total', '>', 0)
+            ->orderByDesc('id')
+            ->first(['invoice_number']);
+        $alreadyBilledC = Invoice::query()
+            ->where('job_id', $job->id)
+            ->where('status', '!=', Invoice::STATUS_CANCELLED)
+            ->where('blok_c_service_fee', '>', 0)
+            ->orderByDesc('id')
+            ->first(['invoice_number']);
+
         return Inertia::render('finance/invoice-create', [
             'job' => $job,
             'billableCosts' => $job->billableCosts()->get(),
+            'alreadyBilledA' => $alreadyBilledA ? ['invoice_number' => $alreadyBilledA->invoice_number] : null,
+            'alreadyBilledC' => $alreadyBilledC ? ['invoice_number' => $alreadyBilledC->invoice_number] : null,
         ]);
     }
 
@@ -107,6 +124,37 @@ class InvoiceController extends Controller
         // (HARDENING 2026-11-04.)
         $invoice = DB::transaction(function () use ($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa) {
 
+            // TEMUAN LANJUTAN (2026-11-05): Blok A dan Blok C tidak boleh
+            // ditagih dua kali untuk Job yang sama. Guard sebelumnya hanya
+            // mencakup Blok B (job_costs.invoice_id). Invoice susulan tetap
+            // bisa dibuat — hanya untuk biaya Blok B yang belum ditagih
+            // (spesifikasi §6.4: koreksi invoice terkunci lewat nota
+            // kredit/debit, bukan invoice ulang).
+            //  - Blok C adalah input user: tolak bila jasa sudah ditagih.
+            //  - Blok A bukan input user (otomatis dari Snapshot): nol-kan
+            //    di server dengan jejak audit, supaya invoice susulan Blok B
+            //    tetap bisa dibuat.
+            $previousBilled = Invoice::query()
+                ->where('job_id', $job->id)
+                ->where('status', '!=', Invoice::STATUS_CANCELLED)
+                ->lockForUpdate()
+                ->get();
+            $previousInvoiceA = $previousBilled->first(fn ($inv) => (float) $inv->blok_a_total > 0);
+            $previousInvoiceC = $previousBilled->first(fn ($inv) => (float) $inv->blok_c_service_fee > 0);
+
+            if ($previousInvoiceC && $serviceFee > 0) {
+                throw ValidationException::withMessages([
+                    'blok_c_service_fee' => "Jasa PPJK sudah ditagih pada invoice {$previousInvoiceC->invoice_number} — isi Service Fee 0 untuk invoice susulan (hanya biaya Blok B baru yang bisa ditagih).",
+                ]);
+            }
+
+            $blokAExcludedNote = null;
+            if ($previousInvoiceA && $blokATotal > 0) {
+                $blokAExcludedNote = "Blok (a) sudah ditagih pada invoice {$previousInvoiceA->invoice_number} — tidak ditagih ulang pada invoice ini.";
+                $blokA = ['bm' => 0, 'ppn_impor' => 0, 'pph22' => 0, 'ppnbm' => 0, 'pungutan_lain' => 0];
+                $blokATotal = 0;
+            }
+
             // Blok (b) — biaya pihak ketiga (pass-through tanpa markup).
             // HARDENING 2026-11-04: daftar biaya dibaca ulang DI DALAM transaksi
             // dengan row lock (Job::billableCosts — definisi yang SAMA dengan
@@ -152,7 +200,10 @@ class InvoiceController extends Controller
                 'blok_a_ppnbm' => $blokA['ppnbm'],
                 'blok_a_pungutan_lain' => $blokA['pungutan_lain'],
                 'blok_a_total' => $blokATotal,
-                'snapshot_pib_id' => $snapshot?->id,
+                // Snapshot hanya di-link bila pungutannya benar-benar
+                // ditagih invoice ini (bila Blok A dinol-kan karena sudah
+                // ditagih sebelumnya, link dikosongkan).
+                'snapshot_pib_id' => $blokATotal > 0 ? $snapshot?->id : null,
                 'blok_b_total' => $blokBTotal,
                 'blok_b_ppn' => $blokBPPN,
                 'blok_c_service_fee' => $serviceFee,
@@ -215,7 +266,10 @@ class InvoiceController extends Controller
                 ]);
             }
 
-            Audit::record('invoice.created', $invoice, ['invoice_number' => $invoiceNumber], 'Pembuatan draf invoice');
+            Audit::record('invoice.created', $invoice, [
+                'invoice_number' => $invoiceNumber,
+                'blok_a_excluded' => $blokAExcludedNote,
+            ], 'Pembuatan draf invoice');
 
             return $invoice;
         });

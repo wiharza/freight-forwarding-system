@@ -15,7 +15,9 @@ class MasterDataSeeder extends Seeder
 {
     public function run(): void
     {
-        $companyId = app(CompanyContext::class)->id();
+        // TEMUAN LANJUTAN (2026-11-05): seeder standalone wajib tenant
+        // eksplisit — jangan pernah jatuh ke company ber-ID terendah.
+        $companyId = app(CompanyContext::class)->requireExplicitId('MasterDataSeeder');
 
         // 1. Mata Uang (§6.6, Q24): v1 hanya USD aktif
         $currencies = [

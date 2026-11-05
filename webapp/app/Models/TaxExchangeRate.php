@@ -41,6 +41,10 @@ class TaxExchangeRate extends Model
             ->where('currency_code', strtoupper($currencyCode))
             ->whereDate('valid_from', '<=', $targetDate)
             ->whereDate('valid_to', '>=', $targetDate)
+            // Periode KMK riil tidak tumpang tindih; bila dua baris cocok
+            // (mis. baris seed lebar di test), yang terbaru yang menang —
+            // supaya hasil resolve deterministik.
+            ->orderByDesc('valid_from')
             ->first();
     }
 }

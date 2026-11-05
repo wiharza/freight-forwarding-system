@@ -19,6 +19,9 @@ type ItemRow = {
     is_ppn_luxury: boolean;
     is_pph22_exempt: boolean;
     exemption_reason: string;
+    exemption_document_ref: string;
+    is_auction: boolean;
+    auction_price_idr: string;
     pungutan_lain_amount: string;
 };
 
@@ -156,6 +159,9 @@ const emptyItem = (kurs: string): ItemRow => ({
     is_ppn_luxury: false,
     is_pph22_exempt: false,
     exemption_reason: '',
+    exemption_document_ref: '',
+    is_auction: false,
+    auction_price_idr: '',
     pungutan_lain_amount: '0',
 });
 
@@ -204,7 +210,11 @@ export default function CalculatorPib({
     canStoreForm: boolean;
 }) {
     const authUserId = usePage<SharedData>().props.auth.user.id;
-    const defaultKurs = activeTaxRate ? String(activeTaxRate.rate_to_idr) : '1';
+    // TEMUAN LANJUTAN (2026-11-05): kurs TIDAK BOLEH default 1 — nilai 1
+    // untuk valas meruntuhkan CIF Rupiah. Kosong bila tidak ada Kurs Pajak
+    // aktif; server selalu resolve dari baris KMK dan gagal tertutup bila
+    // tidak ada (input ini hanya tampilan, bukan sumber hitung).
+    const defaultKurs = activeTaxRate ? String(activeTaxRate.rate_to_idr) : '';
 
     const { data, setData, post, processing, errors, reset } = useForm<{
         incoterm: string;
@@ -527,6 +537,12 @@ export default function CalculatorPib({
                 </div>
 
                 {/* Form draf baru */}
+                {!activeTaxRate && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                        Kurs Pajak (NDPBM) belum diatur untuk periode ini — hitung PIB akan ditolak sampai Kurs Pajak diisi di master Kurs Pajak.
+                        Jangan isi kurs manual: server hanya memakai baris KMK resmi.
+                    </div>
+                )}
                 {canCalculate ? (
                     <form onSubmit={submit} className="space-y-4">
                         <div className="bg-card space-y-3 rounded-xl border p-4">
@@ -583,10 +599,12 @@ export default function CalculatorPib({
                                                 <Input
                                                     type="number"
                                                     step="0.0001"
-                                                    value={item.kurs_pajak_rate}
-                                                    onChange={(e) => updateItem(i, 'kurs_pajak_rate', e.target.value)}
-                                                    required
+                                                    value={item.currency_code === 'USD' ? item.kurs_pajak_rate : ''}
+                                                    placeholder="KMK (otomatis)"
+                                                    title="Kurs diambil dari Kurs Pajak (KMK) yang berlaku — bukan input manual"
+                                                    readOnly
                                                 />
+                                                <p className="text-muted-foreground mt-0.5 text-[11px]">KMK resmi, bukan input manual.</p>
                                             </div>
                                         </div>
                                         <div className="grid items-end gap-3 sm:grid-cols-6">
@@ -681,11 +699,38 @@ export default function CalculatorPib({
                                                 Bebas PPh 22 (Ps. 4)
                                             </label>
                                             {item.is_pph22_exempt && (
+                                                <>
+                                                    <Input
+                                                        className="h-7 max-w-xs text-xs"
+                                                        placeholder="Alasan pengecualian (wajib)"
+                                                        value={item.exemption_reason}
+                                                        onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
+                                                    />
+                                                    <Input
+                                                        className="h-7 max-w-xs text-xs"
+                                                        placeholder="Ref. dokumen pendukung, cth. SK-123/MK/2026 (wajib)"
+                                                        value={item.exemption_document_ref}
+                                                        onChange={(e) => updateItem(i, 'exemption_document_ref', e.target.value)}
+                                                    />
+                                                </>
+                                            )}
+                                            <label className="flex cursor-pointer items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.is_auction}
+                                                    onChange={(e) => updateItem(i, 'is_auction', e.target.checked)}
+                                                />
+                                                Barang lelang
+                                            </label>
+                                            {item.is_auction && (
                                                 <Input
                                                     className="h-7 max-w-xs text-xs"
-                                                    placeholder="Alasan pengecualian"
-                                                    value={item.exemption_reason}
-                                                    onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0.01"
+                                                    placeholder="Harga jual lelang (Rp, wajib)"
+                                                    value={item.auction_price_idr}
+                                                    onChange={(e) => updateItem(i, 'auction_price_idr', e.target.value)}
                                                 />
                                             )}
                                         </div>

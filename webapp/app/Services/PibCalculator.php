@@ -70,24 +70,23 @@ class PibCalculator
         }
 
         // 2. Kurs Pajak Kemenkeu (NDPBM - Rabu s.d Selasa)
-        // TEMUAN #4 (2026-11-04): kurs yang hilang TIDAK BOLEH diam-diam
-        // menjadi 1.0 — untuk valas itu meruntuhkan CIF Rupiah (dan semua
-        // pungutan turunannya, mis. CIF USD 50.000 × 1,0 = Rp 50.000) tanpa
-        // jejak. IDR = 1.0 menurut definisi; valas tanpa baris Kurs Pajak
-        // untuk periode itu = gagal dengan pesan yang jelas.
-        $kursPajakRate = (float) ($input['kurs_pajak_rate'] ?? 0);
-        if ($kursPajakRate <= 0) {
-            if ($currencyCode === 'IDR') {
-                $kursPajakRate = 1.0;
-            } else {
-                $taxRate = TaxExchangeRate::resolveRate($currencyCode, $filingDate);
-                if (! $taxRate) {
-                    throw ValidationException::withMessages([
-                        'kurs_pajak_rate' => "Kurs Pajak {$currencyCode} tidak tersedia untuk tanggal {$filingDate->toDateString()} — isi Kurs Pajak (KMK) terlebih dahulu sebelum menghitung PIB.",
-                    ]);
-                }
-                $kursPajakRate = (float) $taxRate->rate_to_idr;
+        // TEMUAN LANJUTAN (2026-11-05): kurs untuk valas TIDAK PERNAH
+        // diambil dari input klien. UI sempat mengirim default 1 saat tidak
+        // ada Kurs Pajak aktif, dan kalkulator memakai nilai itu diam-diam
+        // (CIF USD 50.000 × 1,0 = Rp 50.000 — semua pungutan runtuh tanpa
+        // jejak). Selalu resolve dari baris TaxExchangeRate yang berlaku
+        // pada tanggal filing; IDR = 1.0 menurut definisi; valas tanpa
+        // baris Kurs Pajak untuk periode itu = gagal dengan pesan jelas.
+        if ($currencyCode === 'IDR') {
+            $kursPajakRate = 1.0;
+        } else {
+            $taxRate = TaxExchangeRate::resolveRate($currencyCode, $filingDate);
+            if (! $taxRate) {
+                throw ValidationException::withMessages([
+                    'kurs_pajak_rate' => "Kurs Pajak {$currencyCode} tidak tersedia untuk tanggal {$filingDate->toDateString()} — isi Kurs Pajak (KMK) terlebih dahulu sebelum menghitung PIB.",
+                ]);
             }
+            $kursPajakRate = (float) $taxRate->rate_to_idr;
         }
 
         // 3. CIF Valas & CIF Rupiah (presisi penuh tanpa pembulatan prematur, Lampiran E)
@@ -161,12 +160,40 @@ class PibCalculator
 
         // 7. PPh 22 Impor (PMK 51/2025 - urutan terkunci §3.2)
         $isPphExempt = (bool) ($input['is_pph22_exempt'] ?? false);
+        $isAuction = (bool) ($input['is_auction'] ?? false);
+        $auctionPriceIdr = (float) ($input['auction_price_idr'] ?? 0);
         $pphCategory = 'umum';
         $pphRate = 0.025; // default API
+        $pphBasis = $nilaiImpor; // default: Nilai Impor
 
         if ($isPphExempt) {
+            // TEMUAN LANJUTAN (2026-11-05): pembebasan Pasal 4 wajib
+            // alasan DAN referensi dokumen pendukung (spesifikasi §3.3 —
+            // flag manual, dokumen diupload, alasan tampil di Snapshot).
+            // Sebelumnya flag bisa lolos tanpa keduanya.
+            $exemptionReason = trim((string) ($input['exemption_reason'] ?? ''));
+            $exemptionDocRef = trim((string) ($input['exemption_document_ref'] ?? ''));
+            if ($exemptionReason === '' || $exemptionDocRef === '') {
+                throw ValidationException::withMessages([
+                    'exemption_reason' => 'Pembebasan PPh 22 (Pasal 4) wajib mencantumkan alasan DAN referensi dokumen pendukung (mis. nomor SK pembebasan).',
+                ]);
+            }
             $pphCategory = 'bebas_pasal_4';
             $pphRate = 0.0;
+        } elseif ($isAuction) {
+            // TEMUAN LANJUTAN (2026-11-05): barang lelang 7,5% dari HARGA
+            // JUAL LELANG (PMK 51/2025 Pasal 3 ayat (1), riset §2) — basisnya
+            // bukan Nilai Impor. Flag lelang mengalahkan aturan HS (Lampiran
+            // A/B/dll.) karena barangnya sudah dilelang; tanpa harga lelang,
+            // perhitungan gagal tertutup.
+            if ($auctionPriceIdr <= 0) {
+                throw ValidationException::withMessages([
+                    'auction_price_idr' => 'Barang lelang wajib mengisi harga jual lelang — PPh 22 dihitung 7,5% dari harga jual lelang (PMK 51/2025).',
+                ]);
+            }
+            $pphCategory = 'lelang_7.5';
+            $pphRate = 0.0750;
+            $pphBasis = $auctionPriceIdr;
         } else {
             $hasApi = in_array(strtoupper($statusApi), ['API-U', 'API-P', 'API']);
             $rule = Pph22Rule::matchHs($hsCode);
@@ -197,9 +224,9 @@ class PibCalculator
                     $pphCategory = 'emas_batangan_0.25';
                     $pphRate = 0.0025;
                 }
-                // Catatan: barang lelang (7,5% dari HARGA JUAL LELANG, PMK
-                // 51/2025) sengaja belum ditangani — basisnya bukan Nilai
-                // Impor dan model belum punya field harga lelang.
+                // Catatan: barang lelang ditangani di cabang elseif di atas
+                // (7,5% dari harga jual lelang) — di sini hanya aturan HS
+                // non-lelang.
             } else {
                 // Kategori umum: 2.5% dengan API, 7.5% tanpa API
                 if ($hasApi) {
@@ -212,7 +239,7 @@ class PibCalculator
             }
         }
 
-        $pphAmount = self::roundUpToThousand($nilaiImpor * $pphRate);
+        $pphAmount = self::roundUpToThousand($pphBasis * $pphRate);
 
         // 8. PPnBM Impor (PP 73/2019 + PMK 96/2021)
         $ppnbmRate = 0.0;
@@ -250,6 +277,9 @@ class PibCalculator
             'pph22_amount' => $pphAmount,
             'is_pph22_exempt' => $isPphExempt,
             'exemption_reason' => $input['exemption_reason'] ?? null,
+            'exemption_document_ref' => $input['exemption_document_ref'] ?? null,
+            'is_auction' => $isAuction,
+            'auction_price_idr' => $isAuction ? $auctionPriceIdr : null,
             'ppnbm_rate' => $ppnbmRate,
             'ppnbm_amount' => $ppnbmAmount,
             'pungutan_lain_amount' => $pungutanLain,

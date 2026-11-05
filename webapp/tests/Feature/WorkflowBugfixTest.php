@@ -14,6 +14,7 @@ use App\Models\Milestone;
 use App\Models\Payment;
 use App\Models\PaymentAllocation;
 use App\Models\ShippingLine;
+use App\Models\TaxExchangeRate;
 use App\Models\Trip;
 use App\Models\User;
 use App\Models\Vendor;
@@ -101,6 +102,17 @@ class WorkflowBugfixTest extends TestCase
         ]);
 
         $this->job->assignField($this->field, $this->ops);
+
+        // TEMUAN LANJUTAN (2026-11-05): kalkulator selalu resolve Kurs Pajak
+        // dari baris resmi — test BM di file ini butuh baris USD 16000.
+        TaxExchangeRate::query()->create([
+            'kmk_number' => 'KMK-TEST-16000',
+            'valid_from' => '2026-01-01',
+            'valid_to' => '2026-12-31',
+            'currency_code' => 'USD',
+            'rate_to_idr' => '16000',
+            'source' => 'test',
+        ]);
     }
 
     // ------------------------------------------------------------------
@@ -112,9 +124,12 @@ class WorkflowBugfixTest extends TestCase
     {
         $numbers = [];
         for ($i = 0; $i < 3; $i++) {
+            // TEMUAN LANJUTAN (2026-11-05): Jasa PPJK (flat per Job) hanya
+            // boleh ditagih sekali — invoice susulan wajib fee 0. Test ini
+            // menguji penomoran, bukan penagihan ulang jasa.
             $response = $this->actingAs($this->finance)->post(route('finance.invoices.store', ['job' => $this->job->id]), [
                 'invoice_date' => '2026-11-04',
-                'blok_c_service_fee' => 100000,
+                'blok_c_service_fee' => $i === 0 ? 100000 : 0,
                 'blok_c_ppn_rate' => '0.12',
             ]);
             $response->assertSessionHasNoErrors();
