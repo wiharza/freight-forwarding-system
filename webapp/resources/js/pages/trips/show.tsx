@@ -48,6 +48,12 @@ export default function TripsShow({ trip }: { trip: TripDetail }) {
                     <Badge variant={trip.status === 'delivered' ? 'default' : 'outline'}>{trip.status}</Badge>
                 </div>
 
+                {(statusForm.errors as Record<string, string | undefined>).job_closed && (
+                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        {(statusForm.errors as Record<string, string | undefined>).job_closed}
+                    </div>
+                )}
+
                 <div className="grid gap-4 md:grid-cols-2">
                     <div className="bg-card space-y-2 rounded-xl border p-4 text-sm">
                         <h3 className="border-b pb-1 text-sm font-medium">Rute & Pengemudi</h3>

@@ -2,7 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 
 type SuratJalanDetail = {
     id: number;
@@ -32,6 +32,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
     const podForm = useForm({ file: null as File | null });
+    // Tandatangani memakai router.post — error validasinya mendarat di
+    // props.errors halaman (bukan di podForm). Tampilkan keduanya.
+    const pageErrors = usePage().props.errors as Record<string, string | undefined>;
+    const jobClosedError = pageErrors.job_closed ?? (podForm.errors as Record<string, string | undefined>).job_closed;
 
     const submitPod = (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,6 +57,12 @@ export default function SuratJalanShow({ sj }: { sj: SuratJalanDetail }) {
                     </div>
                     <Badge variant={sj.status === 'signed' ? 'default' : 'outline'}>{sj.status}</Badge>
                 </div>
+
+                {jobClosedError && (
+                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        {jobClosedError}
+                    </div>
+                )}
 
                 <div className="grid gap-4 text-sm md:grid-cols-2">
                     <div className="bg-card space-y-2 rounded-xl border p-4">

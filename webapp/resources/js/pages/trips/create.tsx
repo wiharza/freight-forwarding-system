@@ -51,6 +51,12 @@ export default function TripsCreate({ vendors, jobs, locations }: { vendors: Ven
             <div className="flex h-full max-w-5xl flex-1 flex-col gap-6 rounded-xl p-4">
                 <h2 className="text-lg font-medium">Penugasan Trip Trucking</h2>
 
+                {(errors as Record<string, string | undefined>).job_closed && (
+                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        {(errors as Record<string, string | undefined>).job_closed}
+                    </div>
+                )}
+
                 <form onSubmit={submit} className="space-y-6">
                     <div className="bg-card space-y-4 rounded-xl border p-4">
                         <h3 className="border-b pb-2 text-sm font-medium">Job & Vendor</h3>
