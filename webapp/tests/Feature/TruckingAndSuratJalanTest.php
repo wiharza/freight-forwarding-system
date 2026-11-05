@@ -219,7 +219,7 @@ class TruckingAndSuratJalanTest extends TestCase
     {
         $sj = SuratJalan::factory()->create([
             'company_id' => $this->company->id,
-            'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id])->id,
+            'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id, 'job_id' => $this->job->id, 'vendor_id' => $this->vendor->id])->id,
             'sj_number' => 'SJ-001',
             'sj_date' => '2026-11-10',
             'driver_name' => 'Budi',
@@ -248,7 +248,7 @@ class TruckingAndSuratJalanTest extends TestCase
 
         $sj = SuratJalan::factory()->create([
             'company_id' => $this->company->id,
-            'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id])->id,
+            'trip_id' => $this->vendor->trips()->first()->id ?? Trip::factory()->create(['company_id' => $this->company->id, 'job_id' => $this->job->id, 'vendor_id' => $this->vendor->id])->id,
             'sj_number' => 'SJ-001',
             'status' => SuratJalan::STATUS_DRAFT,
         ]);
