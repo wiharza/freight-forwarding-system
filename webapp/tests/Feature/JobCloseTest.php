@@ -440,8 +440,12 @@ class JobCloseTest extends TestCase
         $this->assertNull($job->closed_at);
         $this->assertNull($job->closed_by_user_id);
         $this->assertNull($job->close_reason);
-        // Status kembali ke proyeksi milestone: gate-in empty selesai.
-        $this->assertSame(Job::STATUS_GATE_IN_SELESAI, $job->cached_status);
+        // Status kembali ke proyeksi rantai §2.3: Job ini gate-in empty
+        // selesai DAN invoicenya lunas penuh, jadi tahap terjauhnya adalah
+        // Lunas (temuan audit 8 item, item 8 — sebelumnya Lunas tidak
+        // pernah dihasilkan sehingga ekspektasi lama adalah Gate-In Empty
+        // Selesai).
+        $this->assertSame(Job::STATUS_LUNAS, $job->cached_status);
 
         // Riwayat penutupan TIDAK terhapus — tetap ada di audit trail.
         $this->assertDatabaseHas('audit_trails', ['action' => 'job.closed', 'object_id' => $job->id]);

@@ -280,6 +280,10 @@ class InvoiceController extends Controller
             return $invoice;
         });
 
+        // Temuan audit 8 item (2026-11-05, item 8): status Job bisa berubah
+        // oleh invoice baru (Ditagih/Lunas setelah Gate-In Empty Selesai).
+        $job->recomputeStatus();
+
         return redirect()->route('finance.invoices.show', $invoice->id);
     }
 
@@ -311,6 +315,9 @@ class InvoiceController extends Controller
 
         $fakturPajak = $request->input('faktur_pajak_number');
         $invoice->approve($request->user(), $fakturPajak);
+
+        // Temuan audit 8 item (2026-11-05, item 8): hitung ulang status Job.
+        $invoice->job->recomputeStatus();
 
         return redirect()->back();
     }
@@ -510,6 +517,11 @@ class InvoiceController extends Controller
             if ($invoice->sisaTagihan() <= 0) {
                 $invoice->update(['status' => Invoice::STATUS_LOCKED]);
             }
+
+            // Temuan audit 8 item (2026-11-05, item 8): alokasi mengubah
+            // total_paid — status Job bisa berubah ke Lunas (setelah
+            // Gate-In Empty Selesai).
+            $invoice->job->recomputeStatus();
 
             Audit::record('payment.allocated', $payment, [
                 'invoice_id' => $invoice->id,

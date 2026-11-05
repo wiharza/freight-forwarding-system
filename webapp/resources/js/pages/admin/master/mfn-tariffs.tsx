@@ -114,9 +114,9 @@ export default function MfnTariffs({ items, search }: { items: Paginated<MfnItem
                                 />
                             </div>
                             <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Tarif baru selalu tersimpan sebagai <strong>Perlu Verifikasi</strong> dan baru sah
-                                    untuk filing setelah diverifikasi pengguna lain (maker-checker, ADR 0006).
+                                <p className="text-muted-foreground text-sm">
+                                    Tarif baru selalu tersimpan sebagai <strong>Perlu Verifikasi</strong> dan baru sah untuk filing setelah
+                                    diverifikasi pengguna lain (maker-checker, ADR 0006).
                                 </p>
                             </div>
                             <div>
