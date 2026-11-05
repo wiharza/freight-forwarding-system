@@ -7,6 +7,7 @@ use App\Models\CustomsDeclaration;
 use App\Models\Importir;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Models\InvoiceNumberCounter;
 use App\Models\Job;
 use App\Models\JobCost;
 use App\Models\Payment;
@@ -14,6 +15,7 @@ use App\Models\PaymentAllocation;
 use App\Models\TitipanDana;
 use App\Services\JobClose;
 use App\Support\Audit;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -124,6 +126,16 @@ class InvoiceController extends Controller
         // (HARDENING 2026-11-04.)
         $invoice = DB::transaction(function () use ($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa) {
 
+            // TEMUAN AUDIT 8 ITEM (2026-11-05, item 4): serialisasi per Job.
+            // Kunci baris Job di awal transaksi — invoice kedua untuk Job
+            // yang sama menunggu sampai transaksi pertama selesai, sehingga
+            // guard Blok A/C di bawah selalu membaca state terbaru dan
+            // tidak ada dua invoice pertama yang sama-sama lolos guard.
+            // Tanpa kunci ini, dua request bersamaan sama-sama melihat
+            // "belum ada invoice" dan yang kedua baru gagal di unique
+            // constraint nomor (500), bukan error yang bersih.
+            Job::query()->whereKey($job->id)->lockForUpdate()->firstOrFail();
+
             // TEMUAN LANJUTAN (2026-11-05): Blok A dan Blok C tidak boleh
             // ditagih dua kali untuk Job yang sama. Guard sebelumnya hanya
             // mencakup Blok B (job_costs.invoice_id). Invoice susulan tetap
@@ -170,20 +182,14 @@ class InvoiceController extends Controller
 
             $totalInvoice = $blokATotal + $blokBTotal + $serviceFee + $ppnJasa;
 
-            // Generate nomor invoice berurutan (BUGFIX 2026-11-04: filter_var dengan
-            // FILTER_SANITIZE_NUMBER_INT mempertahankan tanda '-' sehingga
-            // 'INV-2026-000001' menjadi (int)'-2026-000001' = -2026 dan setiap
-            // invoice setelah yang pertama bernomor 'INV-2026-0-2025' lalu
-            // menabrak unique constraint pada invoice ke-3. Ambil urutan dari
-            // digit terakhir nomor-nomor tahun berjalan, bukan dari string utuh.)
-            $year = date('Y');
-            $maxSequence = 0;
-            foreach (Invoice::query()->where('invoice_number', 'like', "INV-{$year}-%")->pluck('invoice_number') as $existing) {
-                if (preg_match('/(\d+)$/', $existing, $m)) {
-                    $maxSequence = max($maxSequence, (int) $m[1]);
-                }
-            }
-            $nextNumber = $maxSequence + 1;
+            // Nomor invoice dari counter per tahun (temuan audit 8 item,
+            // item 4) — baris counter dikunci di dalam transaksi yang sama,
+            // jadi dua invoice bersamaan mendapat urutan berbeda. Pengganti
+            // `max + 1` yang menghitung urutan dari daftar nomor: dua
+            // request bersamaan menghitung angka yang sama dan yang kedua
+            // menabrak unique constraint (500).
+            $year = (int) date('Y');
+            $nextNumber = self::nextInvoiceSequence($year);
             $invoiceNumber = 'INV-'.$year.'-'.str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
 
             $invoice = Invoice::query()->create([
@@ -547,5 +553,46 @@ class InvoiceController extends Controller
         return Inertia::render('finance/exposure', [
             'exposures' => $exposures,
         ]);
+    }
+
+    /**
+     * Ambil urutan nomor invoice berikutnya untuk satu tahun dari counter
+     * (temuan audit 8 item 2026-11-05, item 4). WAJIB dipanggil di dalam
+     * transaksi pembuatan invoice: baris counter dikunci (`lockForUpdate`)
+     * sehingga dua invoice bersamaan mendapat urutan berbeda. Bila baris
+     * tahun berjalan belum ada (invoice pertama tahun itu), dibuat di sini
+     * — balapan pembuatan baris ditangani dengan percobaan ulang singkat
+     * (unique constraint pada `year` membuat satu pihak menang, pihak lain
+     * membaca baris yang sudah ada).
+     */
+    private static function nextInvoiceSequence(int $year): int
+    {
+        $lastError = null;
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $counter = InvoiceNumberCounter::query()->lockForUpdate()->where('year', $year)->first();
+
+            if (! $counter) {
+                try {
+                    $counter = InvoiceNumberCounter::query()->create([
+                        'year' => $year,
+                        'next_sequence' => 1,
+                    ]);
+                } catch (QueryException $e) {
+                    // Baris dibuat transaksi lain di saat yang sama — coba
+                    // lagi membaca (dengan kunci) pada percobaan berikutnya.
+                    $lastError = $e;
+
+                    continue;
+                }
+            }
+
+            $sequence = (int) $counter->next_sequence;
+            $counter->increment('next_sequence');
+
+            return $sequence;
+        }
+
+        throw $lastError ?? new \RuntimeException('Gagal mengambil nomor invoice berikutnya.');
     }
 }
