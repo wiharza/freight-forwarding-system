@@ -14,6 +14,7 @@ use App\Models\PaymentAllocation;
 use App\Models\TitipanDana;
 use App\Services\JobClose;
 use App\Support\Audit;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -122,7 +123,39 @@ class InvoiceController extends Controller
         // + items -> tandai biaya sudah ditagih. Bila ada langkah gagal
         // (termasuk guard double-billing di bawah), semuanya batal.
         // (HARDENING 2026-11-04.)
-        $invoice = DB::transaction(function () use ($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa) {
+        // AUDIT P3 (2026-11-05): nomor invoice max+1 bersifat global antar-Job —
+        // dua pembuatan invoice untuk Job BERBEDA secara bersamaan bisa memilih
+        // nomor yang sama; unique constraint menggagalkan yang kalah dengan 500.
+        // Kunci baris Job hanya menyerialisasi per-Job, jadi tabrakan antar-Job
+        // ditangani dengan mengulang transaksi (nomor dipindai ulang tiap attempt).
+        $invoice = null;
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                $invoice = $this->createInvoiceTransaction($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa);
+                break;
+            } catch (UniqueConstraintViolationException $e) {
+                if ($attempt === 3) {
+                    throw $e;
+                }
+            }
+        }
+
+        return redirect()->route('finance.invoices.show', $invoice->id);
+    }
+
+    private function createInvoiceTransaction(Request $request, Job $job, array $data, Importir $importir, ?CustomsDeclaration $snapshot, array $blokA, float $blokATotal, float $serviceFee, float $dppLain, float $ppnRate, float $ppnJasa): Invoice
+    {
+        return DB::transaction(function () use ($request, $job, $data, $importir, $snapshot, $blokA, $blokATotal, $serviceFee, $dppLain, $ppnRate, $ppnJasa) {
+
+            // AUDIT 2026-11-05 (P2 TOCTOU): lockForUpdate pada Invoice tidak
+            // mengunci apa pun ketika BELUM ada invoice untuk Job ini — dua
+            // request pertama yang bersamaan sama-sama melihat "belum ada"
+            // dan keduanya menagih Blok A + C. Kunci baris Job sebagai
+            // statement pertama transaksi menyerialisasi seluruh pembuatan
+            // invoice per Job (portabel di SQLite maupun PostgreSQL).
+            // Sekalian menyerialisasi generate nomor invoice max+1.
+            $job->refresh();
+            Job::query()->whereKey($job->id)->lockForUpdate()->first();
 
             // TEMUAN LANJUTAN (2026-11-05): Blok A dan Blok C tidak boleh
             // ditagih dua kali untuk Job yang sama. Guard sebelumnya hanya
@@ -273,8 +306,6 @@ class InvoiceController extends Controller
 
             return $invoice;
         });
-
-        return redirect()->route('finance.invoices.show', $invoice->id);
     }
 
     public function show(Invoice $invoice): Response
