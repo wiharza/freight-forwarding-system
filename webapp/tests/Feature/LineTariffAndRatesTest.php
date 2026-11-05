@@ -8,6 +8,7 @@ use App\Models\InternalExchangeRate;
 use App\Models\LineTariff;
 use App\Models\ShippingLine;
 use App\Models\User;
+use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -37,6 +38,7 @@ class LineTariffAndRatesTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->admin1 = User::factory()->create(['company_id' => $this->company->id]);
         $this->admin1->roles()->sync([$this->roleId('admin')]);

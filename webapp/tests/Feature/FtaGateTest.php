@@ -58,6 +58,7 @@ class FtaGateTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->cs = User::factory()->create(['company_id' => $this->company->id]);
         $this->cs->roles()->sync([$this->roleId('cs')]);
