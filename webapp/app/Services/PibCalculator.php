@@ -47,6 +47,31 @@ class PibCalculator
     }
 
     /**
+     * Konversi Nilai Impor ke USD untuk penilaian ambang PPnBM (PP 73/2019,
+     * PV-6 — ambang dalam USD atas Nilai Impor).
+     *
+     * Valas: Nilai Impor (Rp) dibagi Kurs Pajak mata uangnya. IDR: dibagi
+     * Kurs Pajak USD yang berlaku pada tanggal filing; bila tidak ada baris
+     * Kurs Pajak USD, gagal tertutup — ambang tidak bisa dinilai dan
+     * menebak akan salah memungut PPnBM.
+     */
+    private static function nilaiImporUsd(float $nilaiImpor, string $currencyCode, float $kursPajakRate, CarbonInterface $filingDate): float
+    {
+        if ($currencyCode !== 'IDR') {
+            return $kursPajakRate > 0 ? round($nilaiImpor / $kursPajakRate, 4) : 0.0;
+        }
+
+        $usdRate = TaxExchangeRate::resolveRate('USD', $filingDate);
+        if (! $usdRate || (float) $usdRate->rate_to_idr <= 0) {
+            throw ValidationException::withMessages([
+                'kurs_pajak_rate' => 'Kurs Pajak USD tidak tersedia untuk tanggal '.$filingDate->toDateString().' — ambang PPnBM barang mewah (dalam USD) tidak dapat dinilai. Isi Kurs Pajak (KMK) terlebih dahulu.',
+            ]);
+        }
+
+        return round($nilaiImpor / (float) $usdRate->rate_to_idr, 4);
+    }
+
+    /**
      * Hitung satu baris Seri Barang PIB (§3.2, Q28, Q30, Q32).
      */
     public function calculateItem(array $input, string $statusApi = 'API-U', ?string $ftaScheme = null, ?CarbonInterface $filingDate = null): array
@@ -147,8 +172,27 @@ class PibCalculator
         $nilaiImpor = round($cifRupiah + $bmAmount + $pungutanLain, 4);
 
         // 6. PPN Impor (tarif formal 12%, barang umum DPP 11/12 -> efektif 11%)
-        $luxuryCheck = LuxuryGood::checkHs($hsCode, $cifValas);
-        $isPpnLuxury = (bool) ($input['is_ppn_luxury'] ?? $luxuryCheck['is_ppn_luxury']);
+        // TEMUAN AUDIT 8 ITEM (2026-11-05, item 3a): klasifikasi barang
+        // mewah HANYA dari daftar master HS (Q29: sub-daftar PPN-mewah &
+        // PPnBM terpisah). Input klien `is_ppn_luxury` DIABAIKAN — form
+        // mengirim false secara default sehingga HS mewah lolos sebagai
+        // non-mewah (DPP 11/12, PPN kurang 1/12 × Nilai Impor).
+        $luxuryRow = LuxuryGood::findForHs($hsCode);
+        $isPpnLuxury = (bool) ($luxuryRow?->is_ppn_luxury ?? false);
+
+        // Ambang PPnBM (PP 73/2019, PV-6) dinilai dari Nilai Impor dalam
+        // USD (lihat nilaiImporUsd()) — bukan CIF valas (temuan audit 8
+        // item, item 3b). Penentuan tarifnya di langkah 8 di bawah.
+        $hasPpnbm = false;
+        $ppnbmRate = 0.0;
+        if ($luxuryRow && $luxuryRow->has_ppnbm) {
+            $nilaiImporUsd = self::nilaiImporUsd($nilaiImpor, $currencyCode, $kursPajakRate, $filingDate);
+            $threshold = $luxuryRow->import_value_threshold_usd;
+            if ($threshold === null || $nilaiImporUsd > (float) $threshold) {
+                $hasPpnbm = true;
+                $ppnbmRate = (float) $luxuryRow->ppnbm_rate;
+            }
+        }
 
         if ($isPpnLuxury) {
             $dppPpn = $nilaiImpor; // 12% penuh
@@ -241,12 +285,12 @@ class PibCalculator
 
         $pphAmount = self::roundUpToThousand($pphBasis * $pphRate);
 
-        // 8. PPnBM Impor (PP 73/2019 + PMK 96/2021)
-        $ppnbmRate = 0.0;
+        // 8. PPnBM Impor (PP 73/2019 + PMK 96/2021) — DPP = Nilai Impor
+        // (UU PPN Ps 16D ayat (2)); tarif + ambang sudah dinilai di
+        // langkah 6 (ambang Nilai Impor dalam USD, bukan CIF).
         $ppnbmAmount = 0.0;
 
-        if ($luxuryCheck['has_ppnbm']) {
-            $ppnbmRate = $luxuryCheck['ppnbm_rate'];
+        if ($hasPpnbm) {
             $ppnbmAmount = self::roundUpToThousand($nilaiImpor * $ppnbmRate);
         }
 

@@ -49,16 +49,27 @@ class LuxuryGood extends Model
     }
 
     /**
+     * Cari baris daftar barang mewah untuk satu HS (cocok persis atau
+     * prefix 4 digit — sama seperti checkHs()). Dipakai kalkulator PIB
+     * agar klasifikasi mewah + ambang PPnBM dinilai dari SATU baris yang
+     * sama (temuan audit 8 item, item 3a/3b).
+     */
+    public static function findForHs(string $hsCode): ?self
+    {
+        $cleanHs = str_replace(['.', ' ', '-'], '', trim($hsCode));
+
+        return self::query()
+            ->where('hs_code', $hsCode)
+            ->orWhere('hs_code', substr($cleanHs, 0, 4))
+            ->first();
+    }
+
+    /**
      * Cek apakah HS masuk kategori barang mewah PPN atau PPnBM (§3.2, PV-6)
      */
     public static function checkHs(string $hsCode, float $importValueUsd = 0): array
     {
-        $cleanHs = str_replace(['.', ' ', '-'], '', trim($hsCode));
-
-        $item = self::query()
-            ->where('hs_code', $hsCode)
-            ->orWhere('hs_code', substr($cleanHs, 0, 4))
-            ->first();
+        $item = self::findForHs($hsCode);
 
         if (! $item) {
             return [
