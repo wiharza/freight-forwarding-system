@@ -124,9 +124,12 @@ class WorkflowBugfixTest extends TestCase
     {
         $numbers = [];
         for ($i = 0; $i < 3; $i++) {
+            // TEMUAN LANJUTAN (2026-11-05): Jasa PPJK (flat per Job) hanya
+            // boleh ditagih sekali — invoice susulan wajib fee 0. Test ini
+            // menguji penomoran, bukan penagihan ulang jasa.
             $response = $this->actingAs($this->finance)->post(route('finance.invoices.store', ['job' => $this->job->id]), [
                 'invoice_date' => '2026-11-04',
-                'blok_c_service_fee' => 100000,
+                'blok_c_service_fee' => $i === 0 ? 100000 : 0,
                 'blok_c_ppn_rate' => '0.12',
             ]);
             $response->assertSessionHasNoErrors();

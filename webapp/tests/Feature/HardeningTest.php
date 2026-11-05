@@ -264,7 +264,9 @@ class HardeningTest extends TestCase
         $this->assertNull($forfeit->fresh()->invoice_id);
 
         // Invoice kedua untuk Job yang sama: tidak ada lagi biaya billable.
-        $invoice2 = $this->buatInvoice();
+        // TEMUAN LANJUTAN (2026-11-05): jasa (flat per Job) hanya ditagih
+        // sekali — invoice susulan wajib fee 0.
+        $invoice2 = $this->buatInvoice(0);
         $this->assertEquals(0, (float) $invoice2->fresh()->blok_b_total);
         $this->assertEquals(0, $invoice2->items()->where('blok', 'b')->count());
         $this->assertFalse($invoice2->items()->where('job_cost_id', $thc->id)->exists());
