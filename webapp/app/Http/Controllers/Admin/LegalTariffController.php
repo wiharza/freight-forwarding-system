@@ -40,10 +40,15 @@ class LegalTariffController extends Controller
             'bm_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
-            'verification_status' => ['required', Rule::in([MfnTariff::STATUS_VERIFIED, MfnTariff::STATUS_UNVERIFIED])],
+            // TEMUAN AUDIT 8 ITEM (2026-11-05, item 2): status verifikasi
+            // TIDAK PERNAH diterima dari request — sebelumnya klien bisa
+            // mengirim `terverifikasi` dan melewati maker-checker. Status
+            // awal selalu `perlu_verifikasi`; verifikasi hanya lewat
+            // endpoint approve oleh pengguna LAIN (MakerChecker, ADR 0006).
             'legal_basis' => ['required', 'string', 'max:255'],
         ]);
 
+        $data['verification_status'] = MfnTariff::STATUS_UNVERIFIED;
         $data['hs_code'] = FormatRules::normalizeHsCode($data['hs_code']);
         $data['created_by_user_id'] = $request->user()->id;
         $tariff = MfnTariff::query()->create($data);
@@ -93,10 +98,12 @@ class LegalTariffController extends Controller
             'fta_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             'effective_from' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
-            'verification_status' => ['required', Rule::in([FtaTariff::STATUS_VERIFIED, FtaTariff::STATUS_UNVERIFIED])],
+            // TEMUAN AUDIT 8 ITEM (2026-11-05, item 2): sama seperti MFN —
+            // status verifikasi tidak pernah diterima dari request.
             'legal_basis' => ['required', 'string', 'max:255'],
         ]);
 
+        $data['verification_status'] = FtaTariff::STATUS_UNVERIFIED;
         $data['hs_code'] = FormatRules::normalizeHsCode($data['hs_code']);
         $data['coo_type'] = FtaTariff::SCHEMES[$data['scheme_code']] ?? null;
         $data['created_by_user_id'] = $request->user()->id;

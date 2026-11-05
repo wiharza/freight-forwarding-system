@@ -42,7 +42,6 @@ export default function MfnTariffs({ items, search }: { items: Paginated<MfnItem
         bm_rate: '0.05',
         effective_from: '2026-01-01',
         effective_to: '',
-        verification_status: 'terverifikasi',
         legal_basis: 'BTKI 2022',
     });
 
@@ -115,16 +114,10 @@ export default function MfnTariffs({ items, search }: { items: Paginated<MfnItem
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="verification_status">Status Verifikasi Hukum</Label>
-                                <select
-                                    id="verification_status"
-                                    className="bg-background w-full rounded-md border p-2 text-sm"
-                                    value={form.data.verification_status}
-                                    onChange={(e) => form.setData('verification_status', e.target.value as 'terverifikasi' | 'perlu_verifikasi')}
-                                >
-                                    <option value="terverifikasi">Terverifikasi (Sah untuk Filing)</option>
-                                    <option value="perlu_verifikasi">Perlu Verifikasi (Draf Saja)</option>
-                                </select>
+                                <p className="text-sm text-muted-foreground">
+                                    Tarif baru selalu tersimpan sebagai <strong>Perlu Verifikasi</strong> dan baru sah
+                                    untuk filing setelah diverifikasi pengguna lain (maker-checker, ADR 0006).
+                                </p>
                             </div>
                             <div>
                                 <Label htmlFor="legal_basis">Dasar Hukum (PMK)</Label>
