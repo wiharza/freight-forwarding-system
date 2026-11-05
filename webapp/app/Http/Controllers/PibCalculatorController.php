@@ -102,7 +102,12 @@ class PibCalculatorController extends Controller
             'items.*.kurs_pajak_rate' => ['nullable', 'numeric', 'min:0'],
             'items.*.is_ppn_luxury' => ['boolean'],
             'items.*.is_pph22_exempt' => ['boolean'],
-            'items.*.exemption_reason' => ['nullable', 'string'],
+            'items.*.exemption_reason' => ['nullable', 'string', 'max:255', 'required_if:items.*.is_pph22_exempt,true'],
+            // Pembebasan Pasal 4 (§3.3): alasan + dokumen pendukung wajib
+            // bila flag pembebasan di-set (kalkulator juga menegakkannya).
+            'items.*.exemption_document_ref' => ['nullable', 'string', 'max:100', 'required_if:items.*.is_pph22_exempt,true'],
+            'items.*.is_auction' => ['boolean'],
+            'items.*.auction_price_idr' => ['nullable', 'numeric', 'min:0.01', 'required_if:items.*.is_auction,true'],
             'items.*.pungutan_lain_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
 
@@ -191,6 +196,27 @@ class PibCalculatorController extends Controller
 
             throw ValidationException::withMessages([
                 'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} memakai tarif master berstatus Perlu Verifikasi (ADR 0008). Verifikasi tarifnya terlebih dahulu.",
+            ]);
+        }
+
+        // TEMUAN LANJUTAN (2026-11-05): pembebasan PPh 22 Pasal 4 pada
+        // draf LAMA (dibuat sebelum alasan + dokumen pendukung diwajibkan)
+        // tidak boleh lolos approve tanpa keduanya.
+        $badExemptItems = $declaration->items()
+            ->where('is_pph22_exempt', true)
+            ->where(function ($q) {
+                $q->whereNull('exemption_reason')->orWhere('exemption_reason', '')
+                    ->orWhereNull('exemption_document_ref')->orWhere('exemption_document_ref', '');
+            })
+            ->get(['item_number', 'hs_code']);
+
+        if ($badExemptItems->isNotEmpty()) {
+            $detail = $badExemptItems
+                ->map(fn ($item) => "Seri {$item->item_number} (HS {$item->hs_code})")
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} dibebaskan PPh 22 (Pasal 4) tanpa alasan dan/atau referensi dokumen pendukung (§3.3). Lengkapi draf terlebih dahulu.",
             ]);
         }
 

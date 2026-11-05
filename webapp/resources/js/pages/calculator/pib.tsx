@@ -19,6 +19,9 @@ type ItemRow = {
     is_ppn_luxury: boolean;
     is_pph22_exempt: boolean;
     exemption_reason: string;
+    exemption_document_ref: string;
+    is_auction: boolean;
+    auction_price_idr: string;
     pungutan_lain_amount: string;
 };
 
@@ -156,6 +159,9 @@ const emptyItem = (kurs: string): ItemRow => ({
     is_ppn_luxury: false,
     is_pph22_exempt: false,
     exemption_reason: '',
+    exemption_document_ref: '',
+    is_auction: false,
+    auction_price_idr: '',
     pungutan_lain_amount: '0',
 });
 
@@ -693,11 +699,38 @@ export default function CalculatorPib({
                                                 Bebas PPh 22 (Ps. 4)
                                             </label>
                                             {item.is_pph22_exempt && (
+                                                <>
+                                                    <Input
+                                                        className="h-7 max-w-xs text-xs"
+                                                        placeholder="Alasan pengecualian (wajib)"
+                                                        value={item.exemption_reason}
+                                                        onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
+                                                    />
+                                                    <Input
+                                                        className="h-7 max-w-xs text-xs"
+                                                        placeholder="Ref. dokumen pendukung, cth. SK-123/MK/2026 (wajib)"
+                                                        value={item.exemption_document_ref}
+                                                        onChange={(e) => updateItem(i, 'exemption_document_ref', e.target.value)}
+                                                    />
+                                                </>
+                                            )}
+                                            <label className="flex cursor-pointer items-center gap-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={item.is_auction}
+                                                    onChange={(e) => updateItem(i, 'is_auction', e.target.checked)}
+                                                />
+                                                Barang lelang
+                                            </label>
+                                            {item.is_auction && (
                                                 <Input
                                                     className="h-7 max-w-xs text-xs"
-                                                    placeholder="Alasan pengecualian"
-                                                    value={item.exemption_reason}
-                                                    onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0.01"
+                                                    placeholder="Harga jual lelang (Rp, wajib)"
+                                                    value={item.auction_price_idr}
+                                                    onChange={(e) => updateItem(i, 'auction_price_idr', e.target.value)}
                                                 />
                                             )}
                                         </div>
