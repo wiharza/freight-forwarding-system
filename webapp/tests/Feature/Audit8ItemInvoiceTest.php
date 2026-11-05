@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Company;
 use App\Models\Importir;
+use App\Models\Invoice;
 use App\Models\InvoiceNumberCounter;
 use App\Models\Job;
 use App\Models\ShippingLine;
@@ -102,6 +103,33 @@ class Audit8ItemInvoiceTest extends TestCase
         ]);
         $response->assertSessionHasNoErrors();
         $this->assertDatabaseHas('invoices', ['job_id' => $this->job->id, 'invoice_number' => "INV-{$year}-000002"]);
+    }
+
+    #[Test]
+    public function counter_tidak_mengulang_nomor_invoice_lama(): void
+    {
+        // KOREKSI E2E VPS 2026-11-05: database yang sudah berisi invoice
+        // dari penomoran `max + 1` lama (atau nomor manual) harus membuat
+        // counter mulai DI ATAS nomor tertinggi yang ada — bukan dari 1.
+        // Tanpa ini, setiap store() menabrak unique constraint
+        // INV-{tahun}-000001 (500) dan rollback ikut menghapus baris
+        // counter yang baru dibuat, sehingga percobaan berikutnya mengulang
+        // 000001 selamanya. Direproduksi di VPS Postgres (log 08:21–08:25
+        // WIB: tiga insert INV-2026-000001 gagal 23505, tabel counter
+        // tetap kosong).
+        $year = date('Y');
+
+        Invoice::factory()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'importir_id' => $this->importir->id,
+            'invoice_number' => "INV-{$year}-002033",
+        ]);
+
+        $this->buatInvoice($this->job, 1000000);
+
+        $this->assertDatabaseHas('invoices', ['job_id' => $this->job->id, 'invoice_number' => "INV-{$year}-002034"]);
+        $this->assertSame(2035, (int) InvoiceNumberCounter::query()->where('year', $year)->value('next_sequence'));
     }
 
     private function buatInvoice(Job $job, int $serviceFee): void

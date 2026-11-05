@@ -589,6 +589,18 @@ class InvoiceController extends Controller
      * — balapan pembuatan baris ditangani dengan percobaan ulang singkat
      * (unique constraint pada `year` membuat satu pihak menang, pihak lain
      * membaca baris yang sudah ada).
+     *
+     * KOREKSI E2E VPS 2026-11-05: baris baru TIDAK boleh mulai dari 1
+     * begitu saja — database yang sudah berisi invoice dari penomoran
+     * `max + 1` lama (mis. INV-2026-000001 sudah ada) akan menabrak
+     * unique constraint pada SETIAP percobaan, dan rollback transaksi
+     * ikut menghapus baris counter yang baru dibuat sehingga tabel
+     * counter tetap kosong selamanya (loop 000001). Karena itu urutan
+     * awal diambil dari nomor tertinggi yang sudah ada tahun itu + 1
+     * (tanpa tenant scope: nomor invoice bersifat global, sama seperti
+     * constraint-nya). Nomor di luar pola `INV-{tahun}-{angka}` — mis.
+     * nomor manual `INV-CORE-…` — tidak masuk hitungan karena tidak
+     * mungkin bertabrakan dengan urutan counter.
      */
     private static function nextInvoiceSequence(int $year): int
     {
@@ -601,7 +613,7 @@ class InvoiceController extends Controller
                 try {
                     $counter = InvoiceNumberCounter::query()->create([
                         'year' => $year,
-                        'next_sequence' => 1,
+                        'next_sequence' => self::firstSequenceForYear($year),
                     ]);
                 } catch (QueryException $e) {
                     // Baris dibuat transaksi lain di saat yang sama — coba
@@ -619,5 +631,23 @@ class InvoiceController extends Controller
         }
 
         throw $lastError ?? new \RuntimeException('Gagal mengambil nomor invoice berikutnya.');
+    }
+
+    /**
+     * Urutan awal counter untuk satu tahun: nomor tertinggi yang sudah
+     * ada tahun itu + 1, atau 1 bila belum ada invoice bernomor counter
+     * tahun itu. Dipakai hanya saat baris counter tahun berjalan dibuat
+     * pertama kali (lihat nextInvoiceSequence()).
+     */
+    private static function firstSequenceForYear(int $year): int
+    {
+        $max = Invoice::query()
+            ->withoutGlobalScopes()
+            ->where('invoice_number', 'like', 'INV-'.$year.'-%')
+            ->pluck('invoice_number')
+            ->map(fn ($number) => preg_match('/^INV-'.$year.'-(\d+)$/', (string) $number, $m) ? (int) $m[1] : 0)
+            ->max();
+
+        return ($max ?? 0) + 1;
     }
 }
