@@ -1,0 +1,71 @@
+name: ci
+
+# TEMUAN LANJUTAN (2026-11-05): workflow lama tinggal di
+# webapp/.github/workflows/ — GitHub HANYA membaca .github/workflows/ di
+# root repo, dan trigger-nya pun cabang develop/main (repo ini memakai
+# master). Workflow ini yang berlaku: push ke master + semua PR.
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Aplikasi Laravel + Inertia tinggal di subdirektori webapp/.
+        working-directory: webapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, curl, zip, sqlite3, pgsql, intl, bcmath, gd
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: webapp/package-lock.json
+
+      - name: Install PHP dependencies
+        run: composer install -q --no-interaction --prefer-dist
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      # Semua langkah di bawah ini CHECK-ONLY — CI tidak boleh mengubah file.
+      - name: Pint (gaya PHP)
+        run: vendor/bin/pint --test
+
+      - name: ESLint
+        run: npm run lint:check
+
+      - name: Prettier
+        run: npm run format:check
+
+      - name: TypeScript
+        run: npm run typecheck
+
+      # Build dulu: test yang me-render halaman butuh manifest Vite.
+      - name: Build assets
+        run: npm run build
+
+      - name: PHPUnit
+        run: ./vendor/bin/phpunit
