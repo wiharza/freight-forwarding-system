@@ -16,7 +16,6 @@ type ItemRow = {
     insurance_valas: string;
     insurance_basis: string;
     kurs_pajak_rate: string;
-    is_ppn_luxury: boolean;
     is_pph22_exempt: boolean;
     exemption_reason: string;
     exemption_document_ref: string;
@@ -156,7 +155,6 @@ const emptyItem = (kurs: string): ItemRow => ({
     insurance_valas: '',
     insurance_basis: 'input_riil',
     kurs_pajak_rate: kurs,
-    is_ppn_luxury: false,
     is_pph22_exempt: false,
     exemption_reason: '',
     exemption_document_ref: '',
@@ -682,14 +680,9 @@ export default function CalculatorPib({
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-4 text-xs">
-                                            <label className="flex cursor-pointer items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={item.is_ppn_luxury}
-                                                    onChange={(e) => updateItem(i, 'is_ppn_luxury', e.target.checked)}
-                                                />
-                                                Barang mewah (PPnBM)
-                                            </label>
+                                            <span className="text-muted-foreground">
+                                                Barang mewah (PPN/PPnBM) ditentukan server dari daftar master HS — bukan dari isian form.
+                                            </span>
                                             <label className="flex cursor-pointer items-center gap-2">
                                                 <input
                                                     type="checkbox"

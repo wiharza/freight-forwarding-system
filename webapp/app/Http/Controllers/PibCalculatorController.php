@@ -100,7 +100,6 @@ class PibCalculatorController extends Controller
             // gagal tertutup bila tidak ada; nilai klien diabaikan untuk
             // valas. IDR tetap 1.0 menurut definisi.
             'items.*.kurs_pajak_rate' => ['nullable', 'numeric', 'min:0'],
-            'items.*.is_ppn_luxury' => ['boolean'],
             'items.*.is_pph22_exempt' => ['boolean'],
             'items.*.exemption_reason' => ['nullable', 'string', 'max:255', 'required_if:items.*.is_pph22_exempt,true'],
             // Pembebasan Pasal 4 (§3.3): alasan + dokumen pendukung wajib
@@ -217,6 +216,28 @@ class PibCalculatorController extends Controller
 
             throw ValidationException::withMessages([
                 'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} dibebaskan PPh 22 (Pasal 4) tanpa alasan dan/atau referensi dokumen pendukung (§3.3). Lengkapi draf terlebih dahulu.",
+            ]);
+        }
+
+        // TEMUAN AUDIT 8 ITEM (2026-11-05, item 3c): draf LAMA dengan
+        // is_auction=true tetapi tanpa harga jual lelang tidak boleh lolos
+        // approve — PPh 22 lelang 7,5% basisnya HARGA JUAL LELANG (PMK
+        // 51/2025), bukan Nilai Impor. Draf baru sudah diblokir di
+        // storeDraft + kalkulator; blok ini menutup celah draf lama.
+        $badAuctionItems = $declaration->items()
+            ->where('is_auction', true)
+            ->where(function ($q) {
+                $q->whereNull('auction_price_idr')->orWhere('auction_price_idr', '<=', 0);
+            })
+            ->get(['item_number', 'hs_code']);
+
+        if ($badAuctionItems->isNotEmpty()) {
+            $detail = $badAuctionItems
+                ->map(fn ($item) => "Seri {$item->item_number} (HS {$item->hs_code})")
+                ->implode(', ');
+
+            throw ValidationException::withMessages([
+                'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} ditandai barang lelang tanpa harga jual lelang — PPh 22 lelang dihitung 7,5% dari harga jual lelang (PMK 51/2025). Lengkapi draf terlebih dahulu.",
             ]);
         }
 
