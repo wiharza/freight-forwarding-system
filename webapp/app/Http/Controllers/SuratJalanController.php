@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SuratJalan;
 use App\Models\Trip;
+use App\Services\JobClose;
 use App\Support\Audit;
 use App\Support\PrivateFile;
 use Illuminate\Http\RedirectResponse;
@@ -29,6 +30,10 @@ class SuratJalanController extends Controller
     public function store(Request $request, Trip $trip): RedirectResponse
     {
         Gate::authorize('view', $trip);
+
+        // KUNCI TUTUP (§2.3, Q11) — temuan audit 8 item (2026-11-05,
+        // item 7): Surat Jalan tidak boleh dibuat untuk Job tertutup.
+        JobClose::assertNotClosed($trip->job);
 
         $data = $request->validate([
             'sj_number' => ['required', 'string', 'max:50'],
@@ -82,6 +87,10 @@ class SuratJalanController extends Controller
         // HARDENING 2026-11-04: sebelumnya tanpa Gate.
         Gate::authorize('view', $sj->trip);
 
+        // KUNCI TUTUP (§2.3, Q11) — temuan audit 8 item (2026-11-05,
+        // item 7): POD tidak boleh ditandatangani untuk Job tertutup.
+        JobClose::assertNotClosed($sj->trip->job);
+
         $sj->update([
             'status' => SuratJalan::STATUS_SIGNED,
             'signed_by_user_id' => $request->user()->id,
@@ -97,6 +106,10 @@ class SuratJalanController extends Controller
     {
         // HARDENING 2026-11-04: sebelumnya tanpa Gate.
         Gate::authorize('view', $sj->trip);
+
+        // KUNCI TUTUP (§2.3, Q11) — temuan audit 8 item (2026-11-05,
+        // item 7): POD tidak boleh diupload untuk Job tertutup.
+        JobClose::assertNotClosed($sj->trip->job);
 
         $request->validate([
             'file' => ['required', 'file', 'max:20480'], // max 20MB

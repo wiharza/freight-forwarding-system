@@ -6,6 +6,7 @@ use App\Models\Job;
 use App\Models\Location;
 use App\Models\Trip;
 use App\Models\Vendor;
+use App\Services\JobClose;
 use App\Support\Audit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -79,6 +80,10 @@ class TripController extends Controller
         // HARDENING 2026-11-04: pembuat trip juga harus punya akses ke Job-nya.
         Gate::authorize('view', $job);
 
+        // KUNCI TUTUP (§2.3, Q11) — temuan audit 8 item (2026-11-05,
+        // item 7): trip baru tidak boleh dibuat untuk Job tertutup.
+        JobClose::assertNotClosed($job);
+
         $trip = Trip::query()->create([
             'company_id' => $request->user()->company_id,
             'job_id' => $data['job_id'],
@@ -131,6 +136,10 @@ class TripController extends Controller
     {
         // HARDENING 2026-11-04: sebelumnya tanpa Gate.
         Gate::authorize('view', $trip);
+
+        // KUNCI TUTUP (§2.3, Q11) — temuan audit 8 item (2026-11-05,
+        // item 7): status trip Job tertutup tidak boleh diubah.
+        JobClose::assertNotClosed($trip->job);
 
         $data = $request->validate([
             'status' => ['required', Rule::in([
