@@ -73,6 +73,7 @@ class TemuanTambahanTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
         $this->company2 = Company::factory()->create();
 
         $this->cs = User::factory()->create(['company_id' => $this->company->id]);

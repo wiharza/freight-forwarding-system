@@ -52,6 +52,7 @@ class DataQualityTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->admin = User::factory()->create(['company_id' => $this->company->id]);
         $this->admin->roles()->sync([$this->roleId('admin')]);

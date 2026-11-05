@@ -13,6 +13,7 @@ use App\Models\Milestone;
 use App\Models\NotificationLog;
 use App\Models\ShippingLine;
 use App\Models\User;
+use App\Support\CompanyContext;
 use App\Services\FreeTimeAlertService;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
@@ -59,6 +60,7 @@ class FreeTimeAlertTest extends TestCase
         $this->asOf = Carbon::parse('2026-11-10');
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->creator = User::factory()->create(['company_id' => $this->company->id]);
         $this->creator->roles()->sync([$this->roleId('cs')]);

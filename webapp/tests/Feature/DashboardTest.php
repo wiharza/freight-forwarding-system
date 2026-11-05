@@ -53,6 +53,7 @@ class DashboardTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->admin = $this->buatUser('admin');
         $this->finance = $this->buatUser('finance');

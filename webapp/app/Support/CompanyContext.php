@@ -14,21 +14,32 @@ class CompanyContext
     protected ?int $companyId = null;
 
     /**
-     * Company aktif untuk request yang sedang berjalan. Bila belum di-set,
-     * fallback-nya adalah company dengan id TERENDAH (deployment
-     * single-company). PERHATIAN: fallback ini BUKAN "tenant demo" — seeder
-     * dan kode yang membuat data demo WAJIB memanggil set() dengan id tenant
-     * yang dimaksud secara eksplisit (lihat DatabaseSeeder), supaya data
-     * tidak mendarat di tenant yang salah bila ada company lain ber-id lebih
-     * rendah.
+     * Company aktif untuk request yang sedang berjalan.
+     *
+     * TEMUAN AUDIT 8 ITEM (2026-11-05, item 1): fallback ke company ber-ID
+     * terendah DIHAPUS — fallback itu yang membuat Job tenant lain bisa
+     * dibuka lewat URL saat context belum di-set (route model binding jalan
+     * sebelum middleware, atau jalur console yang lupa mengeset context).
+     * Sumber tenant sekarang, berurutan: (1) set() eksplisit — middleware
+     * SetCompanyContext (web, sebelum binding) atau loop per-company di
+     * console; (2) user yang login. Bila keduanya tidak ada, gagal
+     * tertutup dengan pesan jelas — tidak pernah menebak tenant.
      */
     public function id(): int
     {
-        if ($this->companyId === null) {
-            $this->companyId = (int) (Company::query()->min('id') ?? 0);
+        if ($this->companyId !== null) {
+            return $this->companyId;
         }
 
-        return $this->companyId;
+        if (auth()->check()) {
+            return $this->companyId = (int) auth()->user()->company_id;
+        }
+
+        throw new \RuntimeException(
+            'CompanyContext belum di-set dan tidak ada user yang login: tenant tidak boleh ditebak. '.
+            'Di request web, middleware SetCompanyContext mengesetnya dari user yang login; '.
+            'di console, set tenant secara eksplisit per company (lihat FreeTimeAlertService::checkAll).'
+        );
     }
 
     public function set(?int $companyId): void
