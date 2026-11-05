@@ -321,6 +321,10 @@ class DokumenVerifikasiTest extends TestCase
         ]);
         $jobLain->initializeChecklist();
         $docLain = $jobLain->documents()->firstOrFail();
+        // Sejak temuan audit 8 item (item 6), verifikasi mensyaratkan file
+        // bukti — beri file dummy dulu sebelum markVerified.
+        Storage::disk('local')->put('documents/lain.pdf', 'dummy');
+        $docLain->update(['file_path' => 'documents/lain.pdf', 'status' => JobDocument::STATUS_DIUPLOAD]);
         $docLain->markVerified($this->ops1);
 
         // Pemanggil adalah verifikator dokumen lain itu sendiri, supaya
