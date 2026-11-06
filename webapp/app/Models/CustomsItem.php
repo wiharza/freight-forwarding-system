@@ -37,7 +37,7 @@ class CustomsItem extends Model
         'pph22_amount',
         'is_pph22_exempt',
         'exemption_reason',
-        'exemption_document_ref',
+        'exemption_document_id',
         'is_auction',
         'auction_price_idr',
         'ppnbm_rate',
@@ -66,6 +66,7 @@ class CustomsItem extends Model
             'pph22_rate' => 'decimal:4',
             'pph22_amount' => 'decimal:4',
             'is_pph22_exempt' => 'boolean',
+            'exemption_document_id' => 'integer',
             'is_auction' => 'boolean',
             'auction_price_idr' => 'decimal:4',
             'ppnbm_rate' => 'decimal:4',
@@ -79,5 +80,15 @@ class CustomsItem extends Model
     public function declaration(): BelongsTo
     {
         return $this->belongsTo(CustomsDeclaration::class, 'customs_declaration_id');
+    }
+
+    /**
+     * Dokumen pendukung pembebasan PPh 22 Pasal 4 (§3.3) — FK ke dokumen
+     * yang sudah diupload di checklist Job yang sama (keputusan user
+     * 2026-11-06; sebelumnya teks bebas `exemption_document_ref`).
+     */
+    public function exemptionDocument(): BelongsTo
+    {
+        return $this->belongsTo(JobDocument::class, 'exemption_document_id');
     }
 }

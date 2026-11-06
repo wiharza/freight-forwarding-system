@@ -212,14 +212,18 @@ class PibCalculator
 
         if ($isPphExempt) {
             // TEMUAN LANJUTAN (2026-11-05): pembebasan Pasal 4 wajib
-            // alasan DAN referensi dokumen pendukung (spesifikasi §3.3 —
-            // flag manual, dokumen diupload, alasan tampil di Snapshot).
-            // Sebelumnya flag bisa lolos tanpa keduanya.
+            // alasan DAN dokumen pendukung (spesifikasi §3.3 — flag manual,
+            // dokumen diupload, alasan tampil di Snapshot).
+            // KEPUTUSAN 2026-11-06: dokumen pendukung bukan lagi teks bebas
+            // (`exemption_document_ref`) — harus ID dokumen yang sudah
+            // diupload (FK ke job_documents). Kepemilikan Job + keberadaan
+            // file ditegakkan di controller (yang memegang Job); di sini
+            // hanya kehadiran ID-nya, karena service tidak menerima Job.
             $exemptionReason = trim((string) ($input['exemption_reason'] ?? ''));
-            $exemptionDocRef = trim((string) ($input['exemption_document_ref'] ?? ''));
-            if ($exemptionReason === '' || $exemptionDocRef === '') {
+            $exemptionDocId = (int) ($input['exemption_document_id'] ?? 0);
+            if ($exemptionReason === '' || $exemptionDocId <= 0) {
                 throw ValidationException::withMessages([
-                    'exemption_reason' => 'Pembebasan PPh 22 (Pasal 4) wajib mencantumkan alasan DAN referensi dokumen pendukung (mis. nomor SK pembebasan).',
+                    'exemption_reason' => 'Pembebasan PPh 22 (Pasal 4) wajib mencantumkan alasan DAN dokumen pendukung yang sudah diupload (pilih dari checklist dokumen Job ini).',
                 ]);
             }
             $pphCategory = 'bebas_pasal_4';
@@ -321,7 +325,7 @@ class PibCalculator
             'pph22_amount' => $pphAmount,
             'is_pph22_exempt' => $isPphExempt,
             'exemption_reason' => $input['exemption_reason'] ?? null,
-            'exemption_document_ref' => $input['exemption_document_ref'] ?? null,
+            'exemption_document_id' => $input['exemption_document_id'] ?? null,
             'is_auction' => $isAuction,
             'auction_price_idr' => $isAuction ? $auctionPriceIdr : null,
             'ppnbm_rate' => $ppnbmRate,

@@ -3,21 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\CustomsDeclaration;
+use App\Models\CustomsItem;
 use App\Models\FtaDecision;
 use App\Models\FtaForm;
 use App\Models\FtaGateOverride;
 use App\Models\FtaTariff;
 use App\Models\Job;
+use App\Models\JobDocument;
 use App\Models\TaxExchangeRate;
 use App\Services\FtaGate;
 use App\Services\PibCalculator;
 use App\Support\Audit;
 use App\Support\FormatRules;
 use App\Support\MakerChecker;
+use App\Support\PrivateFile;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -59,6 +63,25 @@ class PibCalculatorController extends Controller
                 ->latest()
                 ->take(20)
                 ->get(),
+            // Dokumen terupload Job ini — untuk picker dokumen pendukung
+            // pembebasan PPh 22 Pasal 4 (§3.3, keputusan 2026-11-06: FK,
+            // bukan teks bebas). Hanya baris yang punya file; bila file
+            // sudah tidak ada di disk, baris itu disaring agar picker
+            // tidak menawarkan bukti yang sudah hilang.
+            'documents' => JobDocument::query()
+                ->where('job_id', $job->id)
+                ->whereNotNull('file_path')
+                ->orderBy('document_type')
+                ->orderBy('file_name')
+                ->get(['id', 'document_type', 'file_name', 'file_path'])
+                ->filter(fn (JobDocument $doc) => PrivateFile::exists($doc->file_path))
+                ->map(fn (JobDocument $doc) => [
+                    'id' => $doc->id,
+                    'document_type' => $doc->document_type,
+                    'file_name' => $doc->file_name,
+                ])
+                ->values()
+                ->all(),
             'ftaOverrides' => FtaGateOverride::query()
                 ->whereHas('declaration', fn ($q) => $q->where('job_id', $job->id))
                 ->with('creator:id,name')
@@ -102,9 +125,25 @@ class PibCalculatorController extends Controller
             'items.*.kurs_pajak_rate' => ['nullable', 'numeric', 'min:0'],
             'items.*.is_pph22_exempt' => ['boolean'],
             'items.*.exemption_reason' => ['nullable', 'string', 'max:255', 'required_if:items.*.is_pph22_exempt,true'],
-            // Pembebasan Pasal 4 (§3.3): alasan + dokumen pendukung wajib
-            // bila flag pembebasan di-set (kalkulator juga menegakkannya).
-            'items.*.exemption_document_ref' => ['nullable', 'string', 'max:100', 'required_if:items.*.is_pph22_exempt,true'],
+            // Pembebasan Pasal 4 (§3.3, keputusan 2026-11-06): alasan +
+            // dokumen pendukung wajib bila flag pembebasan di-set — dan
+            // dokumennya harus FK ke dokumen yang SUDAH DIUPLOAD di Job
+            // ini (bukan teks bebas): ada di job_documents, milik Job
+            // ini, dan filenya benar-benar ada di disk privat (cek yang
+            // sama seperti gerbang verifikasi dokumen). Kalkulator juga
+            // menegakkan kehadiran ID-nya.
+            'items.*.exemption_document_id' => [
+                'nullable',
+                'integer',
+                'required_if:items.*.is_pph22_exempt,true',
+                Rule::exists('job_documents', 'id')->where('job_id', $job->id),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $doc = JobDocument::find($value);
+                    if ($doc && ! PrivateFile::exists($doc->file_path)) {
+                        $fail('Dokumen pendukung pembebasan belum diupload — pilih dokumen yang sudah ada filenya di checklist dokumen Job ini.');
+                    }
+                },
+            ],
             'items.*.is_auction' => ['boolean'],
             'items.*.auction_price_idr' => ['nullable', 'numeric', 'min:0.01', 'required_if:items.*.is_auction,true'],
             'items.*.pungutan_lain_amount' => ['nullable', 'numeric', 'min:0'],
@@ -201,13 +240,23 @@ class PibCalculatorController extends Controller
         // TEMUAN LANJUTAN (2026-11-05): pembebasan PPh 22 Pasal 4 pada
         // draf LAMA (dibuat sebelum alasan + dokumen pendukung diwajibkan)
         // tidak boleh lolos approve tanpa keduanya.
-        $badExemptItems = $declaration->items()
+        // KEPUTUSAN 2026-11-06: dokumen pendukung adalah FK ke dokumen
+        // yang sudah diupload di Job ini — draf lama dengan FK kosong,
+        // menunjuk dokumen Job lain, atau dokumen yang filenya sudah
+        // tidak ada di disk, tetap diblokir.
+        $exemptItems = $declaration->items()
             ->where('is_pph22_exempt', true)
-            ->where(function ($q) {
-                $q->whereNull('exemption_reason')->orWhere('exemption_reason', '')
-                    ->orWhereNull('exemption_document_ref')->orWhere('exemption_document_ref', '');
-            })
-            ->get(['item_number', 'hs_code']);
+            ->with('exemptionDocument')
+            ->get(['id', 'item_number', 'hs_code', 'exemption_reason', 'exemption_document_id']);
+
+        $badExemptItems = $exemptItems->filter(function (CustomsItem $item) use ($job) {
+            $doc = $item->exemptionDocument;
+
+            return $item->exemption_reason === null || $item->exemption_reason === ''
+                || $doc === null
+                || (int) $doc->job_id !== (int) $job->id
+                || ! PrivateFile::exists($doc->file_path);
+        });
 
         if ($badExemptItems->isNotEmpty()) {
             $detail = $badExemptItems
@@ -215,7 +264,7 @@ class PibCalculatorController extends Controller
                 ->implode(', ');
 
             throw ValidationException::withMessages([
-                'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} dibebaskan PPh 22 (Pasal 4) tanpa alasan dan/atau referensi dokumen pendukung (§3.3). Lengkapi draf terlebih dahulu.",
+                'approval' => "Snapshot PIB tidak dapat disetujui: {$detail} dibebaskan PPh 22 (Pasal 4) tanpa alasan dan/atau dokumen pendukung yang sudah diupload di Job ini (§3.3). Lengkapi draf terlebih dahulu.",
             ]);
         }
 
