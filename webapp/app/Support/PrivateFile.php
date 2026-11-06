@@ -75,4 +75,25 @@ class PrivateFile
 
         abort(404, 'File tidak ditemukan di penyimpanan.');
     }
+
+    /**
+     * Apakah file benar-benar ada di penyimpanan (disk 'local' dulu, lalu
+     * fallback 'public' untuk file lama). Dipakai gerbang verifikasi
+     * dokumen (temuan audit 8 item, item 6): status `diverifikasi` tidak
+     * boleh diberikan pada baris checklist yang tidak punya bukti file.
+     */
+    public static function exists(?string $path): bool
+    {
+        if (! $path) {
+            return false;
+        }
+
+        foreach (['local', 'public'] as $disk) {
+            if (Storage::disk($disk)->exists($path)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

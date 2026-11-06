@@ -16,6 +16,17 @@ class User extends Authenticatable
     use BelongsToCompany, HasFactory, Notifiable;
 
     /**
+     * User adalah model identitas: login harus mencari user di SEMUA tenant
+     * (tenant baru diketahui setelah user ditemukan). Tanpa ini, user
+     * tenant kedua tidak bisa login dan autentikasi akan gagal tertutup
+     * di CompanyContext::id() (temuan audit 8 item, item 1).
+     */
+    protected static function isTenantScoped(): bool
+    {
+        return false;
+    }
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>

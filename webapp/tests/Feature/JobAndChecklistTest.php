@@ -44,6 +44,7 @@ class JobAndChecklistTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->cs = User::factory()->create(['company_id' => $this->company->id]);
         $this->cs->roles()->sync([$this->roleId('cs')]);
@@ -197,6 +198,8 @@ class JobAndChecklistTest extends TestCase
     #[Test]
     public function override_checklist_importir_tidak_memblokir_dokumen_lengkap(): void
     {
+        Storage::fake('local');
+
         // Importir memiliki override: Packing List tidak diperlukan (§2.4, Q21)
         ImportirChecklistOverride::create([
             'company_id' => $this->company->id,
@@ -217,10 +220,15 @@ class JobAndChecklistTest extends TestCase
         $plDoc = $job->documents()->where('document_type', JobDocument::TYPE_PACKING_LIST)->first();
         $this->assertEquals(JobDocument::STATUS_TIDAK_BERLAKU, $plDoc->status);
 
-        // Verifikasi hanya Invoice & BL
+        // Verifikasi hanya Invoice & BL — sejak temuan audit 8 item
+        // (item 6), verifikasi mensyaratkan file bukti.
         $invDoc = $job->documents()->where('document_type', JobDocument::TYPE_INVOICE)->first();
         $blDoc = $job->documents()->where('document_type', JobDocument::TYPE_BL)->first();
 
+        Storage::disk('local')->put('documents/inv.pdf', 'dummy');
+        Storage::disk('local')->put('documents/bl.pdf', 'dummy');
+        $invDoc->update(['file_path' => 'documents/inv.pdf', 'status' => JobDocument::STATUS_DIUPLOAD]);
+        $blDoc->update(['file_path' => 'documents/bl.pdf', 'status' => JobDocument::STATUS_DIUPLOAD]);
         $invDoc->markVerified($this->ops);
         $blDoc->markVerified($this->ops);
 

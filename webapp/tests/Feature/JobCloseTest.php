@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -61,6 +62,7 @@ class JobCloseTest extends TestCase
         $this->seedRoles();
 
         $this->company = Company::factory()->create();
+        app(CompanyContext::class)->set($this->company->id);
 
         $this->admin = User::factory()->create(['company_id' => $this->company->id]);
         $this->admin->roles()->sync([$this->roleId('admin')]);
@@ -139,9 +141,17 @@ class JobCloseTest extends TestCase
             'created_by_user_id' => $this->ops->id,
         ]);
 
-        // (c) arsip seluruh fase terverifikasi
+        // (c) arsip seluruh fase terverifikasi — sejak temuan audit 8 item
+        // (item 6), verifikasi mensyaratkan file bukti: tiap dokumen
+        // diberi file dummy dulu sebelum diverifikasi.
+        Storage::fake('local');
         foreach ($this->job->documents as $doc) {
             if ($doc->status !== JobDocument::STATUS_TIDAK_BERLAKU) {
+                Storage::disk('local')->put("documents/close-{$doc->id}.pdf", 'dummy');
+                $doc->update([
+                    'file_path' => "documents/close-{$doc->id}.pdf",
+                    'status' => JobDocument::STATUS_DIUPLOAD,
+                ]);
                 $doc->markVerified($this->ops);
             }
         }
@@ -430,8 +440,12 @@ class JobCloseTest extends TestCase
         $this->assertNull($job->closed_at);
         $this->assertNull($job->closed_by_user_id);
         $this->assertNull($job->close_reason);
-        // Status kembali ke proyeksi milestone: gate-in empty selesai.
-        $this->assertSame(Job::STATUS_GATE_IN_SELESAI, $job->cached_status);
+        // Status kembali ke proyeksi rantai §2.3: Job ini gate-in empty
+        // selesai DAN invoicenya lunas penuh, jadi tahap terjauhnya adalah
+        // Lunas (temuan audit 8 item, item 8 — sebelumnya Lunas tidak
+        // pernah dihasilkan sehingga ekspektasi lama adalah Gate-In Empty
+        // Selesai).
+        $this->assertSame(Job::STATUS_LUNAS, $job->cached_status);
 
         // Riwayat penutupan TIDAK terhapus — tetap ada di audit trail.
         $this->assertDatabaseHas('audit_trails', ['action' => 'job.closed', 'object_id' => $job->id]);

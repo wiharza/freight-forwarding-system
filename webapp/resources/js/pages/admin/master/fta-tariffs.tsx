@@ -45,7 +45,6 @@ export default function FtaTariffs({
         fta_rate: '0.00',
         effective_from: '2023-01-01',
         effective_to: '2027-12-31',
-        verification_status: 'terverifikasi',
         legal_basis: 'PMK 88/2023',
     });
 

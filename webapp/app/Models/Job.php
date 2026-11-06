@@ -310,10 +310,22 @@ class Job extends Model
 
     /**
      * Hitung ulang status progres turunan (§2.3, Q11).
-     * Urutan: Closed -> Lunas -> Ditagih -> Gate-In Empty -> Terkirim -> Gate-Out -> SPPB -> PIB Filed -> Dokumen Lengkap -> Draft.
+     *
+     * Rantai status dikunci spek §2.3: Draft → Dokumen Lengkap → {pabean:
+     * PIB Filed → SPPB} ∥ {logistik: DO Terbit → Gate-Out Sebagian/Selesai
+     * → Terkirim → Gate-In Empty Sebagian/Selesai} → Ditagih → Lunas →
+     * Closed. Status adalah TAHAP TERJAUH yang dicapai — Ditagih/Lunas
+     * baru berlaku SETELAH Gate-In Empty Selesai (bukan sejak invoice
+     * pertama dibuat di tengah jalan; invoice bisa dibuat sejak PIB
+     * Filed). Tanpa invoice, Job yang gate-in selesai tetap
+     * "Gate-In Empty Selesai".
      *
      * Closed mengunci status: Job yang tertutup TIDAK dihitung ulang dari
      * milestone — penutupan hanya dibuka lewat reopen beralasan (§2.3).
+     *
+     * TEMUAN AUDIT 8 ITEM (2026-11-05, item 8): docblock lama menulis
+     * urutan "Closed -> Lunas -> Ditagih -> Gate-In ..." tetapi
+     * implementasi tidak pernah menghasilkan Lunas/Ditagih sama sekali.
      */
     public function recomputeStatus(): string
     {
@@ -331,6 +343,15 @@ class Job extends Model
                 ->count('container_id');
 
             if ($gateInCount >= $totalContainers) {
+                // Tahap keuangan rantai §2.3 (temuan audit 8 item, item 8):
+                // setelah Gate-In Empty Selesai, status lanjut ke Ditagih /
+                // Lunas bila sudah ada invoice; tanpa invoice tetap
+                // Gate-In Empty Selesai.
+                $financialStatus = $this->financialStatus();
+                if ($financialStatus !== null) {
+                    return $this->setAndReturnStatus($financialStatus);
+                }
+
                 return $this->setAndReturnStatus(self::STATUS_GATE_IN_SELESAI);
             }
 
@@ -393,6 +414,33 @@ class Job extends Model
         $status = $praFilingIncomplete ? self::STATUS_DRAFT : self::STATUS_DOKUMEN_LENGKAP;
 
         return $this->setAndReturnStatus($status);
+    }
+
+    /**
+     * Tahap keuangan rantai status §2.3 (temuan audit 8 item, item 8):
+     * Ditagih bila ada invoice non-cancelled yang belum lunas penuh,
+     * Lunas bila SEMUA invoice non-cancelled lunas penuh, null bila belum
+     * ada invoice sama sekali. Uang dibandingkan sebagai string desimal
+     * (bccomp — sama seperti JobClose::checkInvoiceLunas), bukan float.
+     * Hanya dipanggil setelah Gate-In Empty Selesai (lihat recomputeStatus).
+     */
+    private function financialStatus(): ?string
+    {
+        $invoices = $this->invoices()
+            ->where('status', '!=', Invoice::STATUS_CANCELLED)
+            ->get(['total_invoice', 'total_paid']);
+
+        if ($invoices->isEmpty()) {
+            return null;
+        }
+
+        foreach ($invoices as $invoice) {
+            if (bccomp((string) $invoice->total_invoice, (string) $invoice->total_paid, 4) > 0) {
+                return self::STATUS_DITAGIH;
+            }
+        }
+
+        return self::STATUS_LUNAS;
     }
 
     private function setAndReturnStatus(string $status): string

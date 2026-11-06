@@ -4,9 +4,11 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToCompany;
 use App\Support\Audit;
+use App\Support\PrivateFile;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 class JobDocument extends Model
 {
@@ -86,6 +88,18 @@ class JobDocument extends Model
 
     public function markVerified(User $verifier, ?string $notes = null): void
     {
+        // TEMUAN AUDIT 8 ITEM (2026-11-05, item 6): verifikasi mensyaratkan
+        // bukti file — baris checklist yang belum pernah diupload (file_path
+        // kosong, atau file sudah tidak ada di disk) TIDAK BOLEH menjadi
+        // `diverifikasi`, kalau tidak checklist bisa tampil lengkap tanpa
+        // bukti apa pun. Ditegakkan di sini (jalur bersama semua pemanggil),
+        // bukan hanya di controller.
+        if (! PrivateFile::exists($this->file_path)) {
+            throw ValidationException::withMessages([
+                'document' => "Dokumen {$this->document_type} belum diupload — verifikasi membutuhkan file bukti. Upload filenya terlebih dahulu.",
+            ]);
+        }
+
         $this->update([
             'status' => self::STATUS_DIVERIFIKASI,
             'verified_by_user_id' => $verifier->id,

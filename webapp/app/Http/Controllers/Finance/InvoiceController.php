@@ -140,6 +140,10 @@ class InvoiceController extends Controller
             }
         }
 
+        // Temuan audit 8 item (2026-11-05, item 8): status Job bisa berubah
+        // oleh invoice baru (Ditagih/Lunas setelah Gate-In Empty Selesai).
+        $job->recomputeStatus();
+
         return redirect()->route('finance.invoices.show', $invoice->id);
     }
 
@@ -337,6 +341,9 @@ class InvoiceController extends Controller
         $fakturPajak = $request->input('faktur_pajak_number');
         $invoice->approve($request->user(), $fakturPajak);
 
+        // Temuan audit 8 item (2026-11-05, item 8): hitung ulang status Job.
+        $invoice->job->recomputeStatus();
+
         return redirect()->back();
     }
 
@@ -471,6 +478,19 @@ class InvoiceController extends Controller
                 $totalAllocatedThisRequest += $alloc['amount'];
             }
 
+            // TEMUAN AUDIT 8 ITEM (2026-11-05, item 5): total alokasi juga
+            // dibatasi SISA TAGIHAN invoice — bukan hanya sisa pembayaran.
+            // Tanpa invoice_item_id, cek per-baris di atas dilewati sehingga
+            // alokasi bisa melampaui total invoice selama masih dalam
+            // nominal payment (total_paid > total_invoice). Baris invoice
+            // sudah terkunci, jadi sisaTagihan() di sini adalah saldo
+            // sebelum request ini — batas yang benar untuk batch ini.
+            if ($totalAllocatedThisRequest > (float) $invoice->sisaTagihan()) {
+                throw ValidationException::withMessages([
+                    'allocations' => 'Total alokasi melebihi sisa tagihan invoice (tersisa Rp '.number_format($invoice->sisaTagihan(), 0, ',', '.').').',
+                ]);
+            }
+
             // Batas: total alokasi KUMULATIF tidak boleh melebihi jumlah pembayaran
             if ($totalAllocatedThisRequest > $sisaPayment) {
                 throw ValidationException::withMessages([
@@ -522,6 +542,11 @@ class InvoiceController extends Controller
             if ($invoice->sisaTagihan() <= 0) {
                 $invoice->update(['status' => Invoice::STATUS_LOCKED]);
             }
+
+            // Temuan audit 8 item (2026-11-05, item 8): alokasi mengubah
+            // total_paid — status Job bisa berubah ke Lunas (setelah
+            // Gate-In Empty Selesai).
+            $invoice->job->recomputeStatus();
 
             Audit::record('payment.allocated', $payment, [
                 'invoice_id' => $invoice->id,

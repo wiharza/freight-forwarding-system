@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\CustomsDeclaration;
 use App\Models\Importir;
 use App\Models\Job;
+use App\Models\JobDocument;
 use App\Models\Location;
 use App\Models\ShippingLine;
 use App\Models\TaxExchangeRate;
@@ -13,6 +14,7 @@ use App\Models\User;
 use App\Services\PibCalculator;
 use App\Support\CompanyContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\SeedsRoles;
@@ -40,6 +42,9 @@ class AuditLanjutanPph22Test extends TestCase
     private Importir $importir;
 
     private Job $job;
+
+    /** Dokumen pendukung yang sudah diupload di Job ini (file ada di disk). */
+    private JobDocument $docPendukung;
 
     protected function setUp(): void
     {
@@ -83,6 +88,24 @@ class AuditLanjutanPph22Test extends TestCase
             'currency_code' => 'USD',
             'rate_to_idr' => '16000',
             'source' => 'test',
+        ]);
+
+        // Dokumen pendukung pembebasan: file SK benar-benar ada di disk
+        // privat (keputusan 2026-11-06: FK ke dokumen terupload, bukan
+        // teks bebas).
+        Storage::fake('local');
+        $path = "documents/{$this->company->id}/{$this->job->id}/sk-pembebasan.pdf";
+        Storage::disk('local')->put($path, 'dummy');
+        $this->docPendukung = JobDocument::query()->create([
+            'company_id' => $this->company->id,
+            'job_id' => $this->job->id,
+            'phase' => JobDocument::PHASE_PRA_FILING,
+            'document_type' => JobDocument::TYPE_INVOICE,
+            'status' => JobDocument::STATUS_DIUPLOAD,
+            'file_path' => $path,
+            'file_name' => 'sk-pembebasan.pdf',
+            'uploaded_by_user_id' => $this->customs->id,
+            'uploaded_at' => now(),
         ]);
     }
 
@@ -167,7 +190,7 @@ class AuditLanjutanPph22Test extends TestCase
                 'insurance_basis' => 'input_riil',
                 'insurance_valas' => '10',
                 'is_pph22_exempt' => true,
-                // sengaja tanpa exemption_reason dan exemption_document_ref
+                // sengaja tanpa exemption_reason dan exemption_document_id
             ]],
         ]);
 
@@ -189,11 +212,11 @@ class AuditLanjutanPph22Test extends TestCase
                 'insurance_valas' => '10',
                 'is_pph22_exempt' => true,
                 'exemption_reason' => 'Hibah bencana alam — SK Menkeu No. 123/2026.',
-                // sengaja tanpa exemption_document_ref
+                // sengaja tanpa exemption_document_id
             ]],
         ]);
 
-        $response->assertSessionHasErrors(['items.0.exemption_document_ref']);
+        $response->assertSessionHasErrors(['items.0.exemption_document_id']);
         $this->assertDatabaseCount('customs_declarations', 0);
     }
 
@@ -211,7 +234,7 @@ class AuditLanjutanPph22Test extends TestCase
                 'insurance_valas' => '10',
                 'is_pph22_exempt' => true,
                 'exemption_reason' => 'Hibah bencana alam — SK Menkeu No. 123/2026.',
-                'exemption_document_ref' => 'SK-123/MK/2026 (terlampir di checklist dokumen)',
+                'exemption_document_id' => $this->docPendukung->id,
             ]],
         ]);
 
@@ -220,7 +243,7 @@ class AuditLanjutanPph22Test extends TestCase
         $this->assertTrue((bool) $item->is_pph22_exempt);
         $this->assertSame('bebas_pasal_4', $item->pph22_category);
         $this->assertSame('0.0000', (string) $item->pph22_amount);
-        $this->assertSame('SK-123/MK/2026 (terlampir di checklist dokumen)', $item->exemption_document_ref);
+        $this->assertSame($this->docPendukung->id, $item->exemption_document_id);
     }
 
     #[Test]
@@ -243,7 +266,7 @@ class AuditLanjutanPph22Test extends TestCase
             'currency_code' => 'USD',
             'is_pph22_exempt' => true,
             'exemption_reason' => 'Hibah bencana.',
-            'exemption_document_ref' => null,
+            'exemption_document_id' => null,
             'pph22_category' => 'bebas_pasal_4',
             'pph22_rate' => 0,
             'pph22_amount' => 0,

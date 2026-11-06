@@ -38,6 +38,16 @@ type ActivityItem = {
     created_at: string | null;
 };
 
+type Paginated<T> = {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+};
+
 type DashboardProps = {
     stats: {
         jobs_active: number;
@@ -49,7 +59,7 @@ type DashboardProps = {
     };
     unpaid: { count: number; total: number } | null;
     can_see_finance: boolean;
-    jobs: DashboardJobRow[];
+    jobs: Paginated<DashboardJobRow>;
     activity: ActivityItem[];
 };
 
@@ -187,7 +197,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                         <CardTitle>Job Aktif</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        {jobs.length === 0 ? (
+                        {jobs.data.length === 0 ? (
                             <p className="text-muted-foreground text-sm">Belum ada Job aktif.</p>
                         ) : (
                             <div className="overflow-x-auto">
@@ -202,7 +212,7 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {jobs.map((job) => {
+                                        {jobs.data.map((job) => {
                                             const ft = freeTimeLabel(job);
                                             return (
                                                 <tr key={job.id} className="border-b last:border-0">
@@ -228,6 +238,42 @@ export default function Dashboard({ stats, unpaid, can_see_finance, jobs, activi
                                         })}
                                     </tbody>
                                 </table>
+                            </div>
+                        )}
+                        {jobs.last_page > 1 && (
+                            <div className="mt-4 flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                    Menampilkan {jobs.from ?? 0}–{jobs.to ?? 0} dari {jobs.total} Job aktif
+                                </span>
+                                <div className="flex gap-2">
+                                    {jobs.current_page > 1 ? (
+                                        <Link
+                                            href={route('dashboard', { page: jobs.current_page - 1 })}
+                                            className="rounded-md border px-3 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                        >
+                                            ← Sebelumnya
+                                        </Link>
+                                    ) : (
+                                        <span className="text-muted-foreground cursor-not-allowed rounded-md border px-3 py-1 opacity-50">
+                                            ← Sebelumnya
+                                        </span>
+                                    )}
+                                    <span className="text-muted-foreground px-1 py-1">
+                                        Halaman {jobs.current_page} dari {jobs.last_page}
+                                    </span>
+                                    {jobs.current_page < jobs.last_page ? (
+                                        <Link
+                                            href={route('dashboard', { page: jobs.current_page + 1 })}
+                                            className="rounded-md border px-3 py-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                        >
+                                            Berikutnya →
+                                        </Link>
+                                    ) : (
+                                        <span className="text-muted-foreground cursor-not-allowed rounded-md border px-3 py-1 opacity-50">
+                                            Berikutnya →
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </CardContent>

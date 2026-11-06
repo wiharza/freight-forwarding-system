@@ -16,10 +16,9 @@ type ItemRow = {
     insurance_valas: string;
     insurance_basis: string;
     kurs_pajak_rate: string;
-    is_ppn_luxury: boolean;
     is_pph22_exempt: boolean;
     exemption_reason: string;
-    exemption_document_ref: string;
+    exemption_document_id: string;
     is_auction: boolean;
     auction_price_idr: string;
     pungutan_lain_amount: string;
@@ -68,6 +67,13 @@ type Declaration = {
 };
 
 const INCOTERMS = ['EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];
+
+/** Dokumen terupload Job ini — untuk picker dokumen pendukung pembebasan. */
+type UploadedDocument = {
+    id: number;
+    document_type: string;
+    file_name: string | null;
+};
 
 type FtaForm = {
     id: number;
@@ -156,10 +162,9 @@ const emptyItem = (kurs: string): ItemRow => ({
     insurance_valas: '',
     insurance_basis: 'input_riil',
     kurs_pajak_rate: kurs,
-    is_ppn_luxury: false,
     is_pph22_exempt: false,
     exemption_reason: '',
-    exemption_document_ref: '',
+    exemption_document_id: '',
     is_auction: false,
     auction_price_idr: '',
     pungutan_lain_amount: '0',
@@ -184,6 +189,7 @@ export default function CalculatorPib({
     canOverride,
     canDecide,
     canStoreForm,
+    documents,
 }: {
     job: {
         id: number;
@@ -208,6 +214,7 @@ export default function CalculatorPib({
     canOverride: boolean;
     canDecide: boolean;
     canStoreForm: boolean;
+    documents: UploadedDocument[];
 }) {
     const authUserId = usePage<SharedData>().props.auth.user.id;
     // TEMUAN LANJUTAN (2026-11-05): kurs TIDAK BOLEH default 1 — nilai 1
@@ -682,14 +689,9 @@ export default function CalculatorPib({
                                             </div>
                                         </div>
                                         <div className="flex flex-wrap gap-4 text-xs">
-                                            <label className="flex cursor-pointer items-center gap-2">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={item.is_ppn_luxury}
-                                                    onChange={(e) => updateItem(i, 'is_ppn_luxury', e.target.checked)}
-                                                />
-                                                Barang mewah (PPnBM)
-                                            </label>
+                                            <span className="text-muted-foreground">
+                                                Barang mewah (PPN/PPnBM) ditentukan server dari daftar master HS — bukan dari isian form.
+                                            </span>
                                             <label className="flex cursor-pointer items-center gap-2">
                                                 <input
                                                     type="checkbox"
@@ -706,12 +708,24 @@ export default function CalculatorPib({
                                                         value={item.exemption_reason}
                                                         onChange={(e) => updateItem(i, 'exemption_reason', e.target.value)}
                                                     />
-                                                    <Input
-                                                        className="h-7 max-w-xs text-xs"
-                                                        placeholder="Ref. dokumen pendukung, cth. SK-123/MK/2026 (wajib)"
-                                                        value={item.exemption_document_ref}
-                                                        onChange={(e) => updateItem(i, 'exemption_document_ref', e.target.value)}
-                                                    />
+                                                    <select
+                                                        className="bg-background h-7 max-w-xs rounded-md border px-2 text-xs"
+                                                        value={item.exemption_document_id}
+                                                        onChange={(e) => updateItem(i, 'exemption_document_id', e.target.value)}
+                                                        required
+                                                    >
+                                                        <option value="">Pilih dokumen pendukung (wajib)</option>
+                                                        {documents.map((d) => (
+                                                            <option key={d.id} value={String(d.id)}>
+                                                                {d.document_type} — {d.file_name ?? 'tanpa nama file'}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    {documents.length === 0 && (
+                                                        <span className="text-xs text-red-600">
+                                                            Belum ada dokumen terupload untuk Job ini — upload dulu di checklist dokumen.
+                                                        </span>
+                                                    )}
                                                 </>
                                             )}
                                             <label className="flex cursor-pointer items-center gap-2">

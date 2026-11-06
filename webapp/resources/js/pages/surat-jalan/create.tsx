@@ -55,6 +55,12 @@ export default function SuratJalanCreate({ trip }: { trip: TripLite }) {
                     </p>
                 </div>
 
+                {(errors as Record<string, string | undefined>).job_closed && (
+                    <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                        {(errors as Record<string, string | undefined>).job_closed}
+                    </div>
+                )}
+
                 <form onSubmit={submit} className="space-y-6">
                     <div className="bg-card space-y-4 rounded-xl border p-4">
                         <div className="grid gap-4 sm:grid-cols-2">
