@@ -5,13 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\AuditTrail;
 use App\Models\Invoice;
 use App\Models\Job;
-use App\Models\Milestone;
 use App\Models\NotificationLog;
+use App\Services\DashboardFreeTime;
 use App\Services\DemurrageCalculator;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use LogicException;
 
 /**
  * Dashboard (§2.1 / laporan (a) Q27): ringkasan operasional sekali lihat —
@@ -23,6 +22,14 @@ use LogicException;
  * NotificationLog::unreadCountFor) — tidak ada perhitungan baru yang
  * menduplikasi logika kalkulator.
  *
+ * KEPUTUSAN 2026-11-06 (cache + paginasi): hitung mundur free time dibaca
+ * dari cache DashboardFreeTime (TTL 10 menit + invalidasi eksplisit saat
+ * milestone berubah), bukan dari kalkulator di setiap request. Statistik
+ * tetap mencakup SELURUH Job aktif (bukan hanya halaman tabel), tapi
+ * nilainya berasal dari cache. Tabel Job dipaginasi server-side 15
+ * baris/halaman — hanya halaman yang diminta yang dikirim ke UI
+ * (sebelumnya seluruh Job aktif dihitung lalu dipotong take(15)).
+ *
  * RBAC (Q23): Field hanya melihat Job yang ditugaskan kepadanya
  * (Job::scopeVisibleTo) dan TIDAK melihat angka keuangan — angka tunggakan
  * hanya dihitung + dikirim bila user punya ability `laporan_keuangan`
@@ -30,7 +37,7 @@ use LogicException;
  */
 class DashboardController extends Controller
 {
-    public function index(Request $request, DemurrageCalculator $calculator): Response
+    public function index(Request $request, DemurrageCalculator $calculator, DashboardFreeTime $freeTime): Response
     {
         $user = $request->user();
         $canSeeFinance = $user->can('laporan_keuangan');
@@ -55,10 +62,11 @@ class DashboardController extends Controller
             ->pluck('total', 'problem_flag')
             ->all();
 
-        // Hitung mundur free time per Job aktif dengan DemurrageCalculator
-        // yang sama seperti halaman detail Job. Tanpa Kurs Internal USD,
-        // kalkulator melempar LogicException (TEMUAN #4): dashboard tetap
-        // tampil dan hitungan Job itu ditandai tidak tersedia, bukan 500.
+        // Hitung mundur free time per Job aktif — dari CACHE
+        // (DashboardFreeTime), bukan dari kalkulator di setiap request.
+        // Tanpa Kurs Internal USD, kalkulator melempar LogicException
+        // (TEMUAN #4): dashboard tetap tampil dan hitungan Job itu
+        // ditandai tidak tersedia, bukan 500.
         $freeTimeStats = ['overdue' => 0, 'urgent' => 0, 'ok' => 0, 'unavailable' => 0];
         $freeTimeByJob = [];
         $activeList = (clone $activeJobs)
@@ -67,15 +75,15 @@ class DashboardController extends Controller
             ->get();
 
         foreach ($activeList as $job) {
-            try {
-                $calc = $calculator->calculateForJob($job);
-            } catch (LogicException) {
+            $entry = $freeTime->forJob($job, $calculator);
+
+            if ($entry['unavailable']) {
                 // Kalkulator gagal (kurs belum diatur). Tandai tidak
                 // tersedia hanya bila Job ini memang punya jam yang
                 // seharusnya berjalan (ada discharge / gate-out aktif);
                 // bila tidak ada jam sama sekali, hitungannya null biasa.
-                $freeTimeByJob[$job->id] = ['unavailable' => $this->jobMayHaveRunningClock($job)];
-                if ($freeTimeByJob[$job->id]['unavailable']) {
+                $freeTimeByJob[$job->id] = ['unavailable' => $entry['may_have_clock']];
+                if ($entry['may_have_clock']) {
                     $freeTimeStats['unavailable']++;
                 }
 
@@ -84,7 +92,7 @@ class DashboardController extends Controller
 
             $worst = null;
             $running = 0;
-            foreach ($calc['containers'] as $container) {
+            foreach ($entry['calc']['containers'] as $container) {
                 $containerWorst = null;
                 foreach (['demurrage', 'detention'] as $kind) {
                     $clock = $container[$kind];
@@ -143,7 +151,15 @@ class DashboardController extends Controller
             ];
         }
 
-        $jobRows = $activeList->take(15)->map(function (Job $job) use ($freeTimeByJob) {
+        // Tabel Job aktif — paginasi server-side (DashboardFreeTime::PER_PAGE):
+        // hanya halaman yang diminta yang dikirim ke UI, dengan hitung
+        // mundur dari peta cache di atas (bukan kalkulator ulang per baris).
+        $paged = (clone $activeJobs)
+            ->with(['importir:id,name'])
+            ->orderByDesc('updated_at')
+            ->paginate(DashboardFreeTime::PER_PAGE);
+
+        $paged->setCollection($paged->getCollection()->map(function (Job $job) use ($freeTimeByJob) {
             $entry = $freeTimeByJob[$job->id] ?? null;
 
             return [
@@ -155,7 +171,7 @@ class DashboardController extends Controller
                 'free_time' => is_array($entry) && isset($entry['remaining_days']) ? $entry : null,
                 'free_time_unavailable' => is_array($entry) && ($entry['unavailable'] ?? false),
             ];
-        })->all();
+        }));
 
         $activity = AuditTrail::query()
             ->where('company_id', $user->company_id)
@@ -186,22 +202,8 @@ class DashboardController extends Controller
             ],
             'unpaid' => $unpaid,
             'can_see_finance' => $canSeeFinance,
-            'jobs' => $jobRows,
+            'jobs' => $paged,
             'activity' => $activity,
         ]);
-    }
-
-    /**
-     * Apakah Job ini mungkin punya jam demurrage/detention yang berjalan —
-     * dipakai saat kalkulator gagal (kurs belum diatur) untuk membedakan
-     * "tidak ada jam berjalan" dari "hitungan tidak tersedia". Dicek dari
-     * milestone pemicu jam (discharge / gate-out full), tanpa kalkulator.
-     */
-    private function jobMayHaveRunningClock(Job $job): bool
-    {
-        return $job->milestones()
-            ->where('is_active', true)
-            ->whereIn('milestone_type', [Milestone::TYPE_DISCHARGE, Milestone::TYPE_GATE_OUT_FULL])
-            ->exists();
     }
 }

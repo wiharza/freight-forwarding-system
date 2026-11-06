@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Job;
 use App\Models\Milestone;
+use App\Services\DashboardFreeTime;
 use App\Services\FreeTimeAlertService;
 use App\Services\JobClose;
 use App\Support\Audit;
@@ -116,6 +117,11 @@ class MilestoneController extends Controller
 
         $job->recomputeStatus();
 
+        // KEPUTUSAN 2026-11-06 (cache dashboard): milestone baru mengubah
+        // input hitung mundur free time — hapus cache dashboard Job ini
+        // agar request berikutnya menghitung ulang dengan tanggal baru.
+        DashboardFreeTime::forgetForJob($job);
+
         // Alarm Free Time (§2.6, Q8, Tiket 15): discharge / gate-out bisa
         // menggeser last free date — evaluasi ulang pemicu Job ini. Hanya
         // pemicu yang tanggalnya sudah tiba dan belum pernah berbunyi yang
@@ -142,6 +148,10 @@ class MilestoneController extends Controller
         JobClose::assertNotClosed($milestone->job);
 
         $milestone->verify($request->user(), $request->input('notes'));
+
+        // Cache dashboard: verifikasi bisa mengubah milestone aktif yang
+        // dipakai kalkulator — hapus cache Job ini.
+        DashboardFreeTime::forgetForJob($milestone->job);
 
         return redirect()->back();
     }
@@ -174,6 +184,9 @@ class MilestoneController extends Controller
 
         // Koreksi tanggal bisa menggeser last free date (§2.6, Q8) — sama
         // seperti store, evaluasi ulang; kegagalan tidak menggagalkan koreksi.
+        // Cache dashboard ikut dihapus: tanggal baru = hitung mundur baru.
+        DashboardFreeTime::forgetForJob($milestone->job);
+
         try {
             app(FreeTimeAlertService::class)->checkForJob($milestone->job);
         } catch (\Throwable $e) {

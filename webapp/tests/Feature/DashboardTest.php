@@ -191,7 +191,8 @@ class DashboardTest extends TestCase
                 ->where('stats.free_time.ok', 1)
                 ->where('stats.free_time.urgent', 0)
                 ->where('stats.free_time.unavailable', 0)
-                ->has('jobs', 2)
+                ->has('jobs.data', 2)
+                ->where('jobs.total', 2)
                 ->has('activity', 1)
                 ->where('activity.0.action', 'job.created'));
     }
@@ -202,8 +203,8 @@ class DashboardTest extends TestCase
         $this->actingAs($this->finance)->get('/dashboard')
             ->assertOk()
             ->assertInertia(function (AssertableInertia $page) {
-                $page->has('jobs', 2);
-                $jobs = $page->toArray()['props']['jobs'];
+                $page->has('jobs.data', 2);
+                $jobs = $page->toArray()['props']['jobs']['data'];
                 $aman = collect($jobs)->firstWhere('job_number', $this->jobAman->job_number);
                 $lewat = collect($jobs)->firstWhere('job_number', $this->jobLewat->job_number);
 
@@ -248,15 +249,15 @@ class DashboardTest extends TestCase
                 ->where('stats.jobs_active', 1)
                 ->where('can_see_finance', false)
                 ->where('unpaid', null)
-                ->has('jobs', 1)
-                ->where('jobs.0.job_number', $this->jobAman->job_number));
+                ->has('jobs.data', 1)
+                ->where('jobs.data.0.job_number', $this->jobAman->job_number));
 
         // Field yang tidak ditugaskan ke Job mana pun: dashboard kosong.
         $this->actingAs($this->fieldLain)->get('/dashboard')
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('stats.jobs_active', 0)
-                ->has('jobs', 0));
+                ->has('jobs.data', 0));
     }
 
     #[Test]
@@ -268,6 +269,6 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('stats.free_time.unavailable', 2)
-                ->where('jobs.0.free_time_unavailable', true));
+                ->where('jobs.data.0.free_time_unavailable', true));
     }
 }
